@@ -135,17 +135,18 @@ async function reactivateProduct(productId) {
  * Returns the next available product ID (current MAX + 1).
  * @returns {Promise<number>}
  */
-async function fetchNextProductId() {
-  const { rows } = await query('SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM products');
+async function fetchNextProductId(runner = null) {
+  const executor = runner || { query };
+  const { rows } = await executor.query('SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM products');
   return Number(rows[0].next_id);
 }
-
 /**
  * Returns the next available inventory ID (current MAX + 1).
  * @returns {Promise<number>}
  */
-async function fetchNextInventoryId() {
-  const { rows } = await query('SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM inventory');
+async function fetchNextInventoryId(runner = null) {
+  const executor = runner || { query };
+  const { rows } = await executor.query('SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM inventory');
   return Number(rows[0].next_id);
 }
 
@@ -163,13 +164,12 @@ async function addProductWithIngredients({ name, category, price, ingredientUsag
 
   return withTransaction(async (client) => {
     await ensureProductActiveColumn(client);
-    const productId = await fetchNextProductId();
+    const productId = await fetchNextProductId(client);
     await client.query(
       'INSERT INTO products (id, name, category, price, active) VALUES ($1, $2, $3, $4, TRUE)',
       [productId, name.trim(), category.trim(), toMoney(price).toFixed(2)]
     );
 
-    // Link each ingredient to the new product; skip any entries with invalid data
     for (const entry of ingredientUsage) {
       const ingredientId = Number(entry.ingredientId);
       const quantityUsed = Number(entry.quantityUsed);
