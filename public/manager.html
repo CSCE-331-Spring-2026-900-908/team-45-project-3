@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Manager Portal</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+  </head>
+  <body data-page="manager">
+    <div class="page-shell inner-page">
+      <nav class="top-nav">
+        <a href="/">Portal</a>
+      </nav>
+
+      <header class="page-header">
+        <p class="eyebrow">Manager Interface</p>
+      </header>
+
+      <main class="stack-layout">
+        <section id="manager-login-card" class="content-card auth-card">
+          <p class="section-label">Step 1</p>
+          <h2>Authenticate for manager access</h2>
+          <form id="manager-login-form" class="auth-form">
+            <label>
+              <span>Username</span>
+              <input name="username" type="text" autocomplete="username" required />
+            </label>
+            <label>
+              <span>Password</span>
+              <input name="password" type="password" autocomplete="current-password" required />
+            </label>
+            <button class="action-button" type="submit">Sign In</button>
+          </form>
+          <p id="manager-login-status" class="status-text" data-tone="neutral">
+            Use a manager account from the employees table.
+          </p>
+        </section>
+
+        <section id="manager-workspace" class="stack-layout" hidden>
+          <section class="content-card">
+            <div class="section-heading">
+              <div>
+                <p class="section-label">Signed In</p>
+                <h2 id="manager-session-name">Manager</h2>
+              </div>
+              <button id="manager-sign-out" class="ghost-button" type="button">Exit to Portal</button>
+            </div>
+            <p id="manager-dashboard-status" class="status-text" data-tone="neutral">Waiting for manager data...</p>
+          </section>
+
+          <section class="stats-grid">
+            <article class="metric-card">
+              <p class="section-label">Revenue</p>
+              <h3 id="manager-revenue-total">$0.00</h3>
+              <p>Total sales currently recorded in the orders table.</p>
+            </article>
+            <article class="metric-card">
+              <p class="section-label">Inventory Alerts</p>
+              <h3 id="manager-low-count">0</h3>
+              <p>Items below the current low-inventory threshold.</p>
+            </article>
+            <article class="metric-card">
+              <p class="section-label">Active Products</p>
+              <h3 id="manager-product-count">0</h3>
+              <p>Menu items currently available to the cashier interface.</p>
+            </article>
+          </section>
+
+          <section class="content-card">
+            <div class="tab-row">
+              <button class="tab-button active" data-manager-tab="reports" type="button">Reports</button>
+              <button class="tab-button" data-manager-tab="menu" type="button">Menu</button>
+              <button class="tab-button" data-manager-tab="inventory" type="button">Inventory</button>
+              <button class="tab-button" data-manager-tab="employees" type="button">Employees</button>
+            </div>
+          </section>
+
+          <section id="manager-tab-reports" class="stack-layout manager-tab-panel">
+            <section class="content-card">
+              <div class="button-row">
+                <button id="report-total-revenue" class="ghost-button" type="button">Total Revenue</button>
+                <button id="report-low-inventory" class="ghost-button" type="button">Low Inventory</button>
+                <button id="report-most-ordered" class="ghost-button" type="button">Most Ordered Items</button>
+                <button id="report-x" class="ghost-button" type="button">X-Report (Today)</button>
+                <button id="report-z" class="ghost-button" type="button">Z-Report (Close Day)</button>
+                <button id="report-reset-z" class="ghost-button" type="button">Reset Z-Report</button>
+              </div>
+
+              <form id="inventory-usage-form" class="compact-form inline-form">
+                <label><span>Start Date</span><input name="startDate" type="date" required /></label>
+                <label><span>End Date</span><input name="endDate" type="date" required /></label>
+                <label><span>Top Items</span><input name="limit" type="number" min="1" value="8" required /></label>
+                <button class="action-button" type="submit">Inventory Usage</button>
+              </form>
+
+              <p id="manager-reports-status" class="status-text" data-tone="neutral">Choose a report action.</p>
+            </section>
+
+            <section class="content-card">
+              <div id="manager-report-table"></div>
+            </section>
+          </section>
+
+          <section id="manager-tab-menu" class="stack-layout manager-tab-panel" hidden>
+            <section class="content-card">
+              <div class="section-heading">
+                <div>
+                  <p class="section-label">Menu Actions</p>
+                  <h2>Products</h2>
+                </div>
+                <label class="inline-check"><input id="manager-show-inactive" type="checkbox" /> Show inactive</label>
+              </div>
+              <div class="button-row">
+                <button id="menu-refresh" class="ghost-button" type="button">Refresh</button>
+                <button id="menu-update-price" class="ghost-button" type="button">Update Price</button>
+                <button id="menu-update-category" class="ghost-button" type="button">Update Category</button>
+                <button id="menu-deactivate" class="ghost-button" type="button">Deactivate Product</button>
+                <button id="menu-reactivate" class="ghost-button" type="button">Reactivate Product</button>
+              </div>
+              <form id="menu-add-form" class="compact-form manager-form-grid">
+                <label><span>Next Product ID</span><input id="menu-next-id" name="nextId" type="number" readonly /></label>
+                <label><span>Name</span><input name="name" type="text" required /></label>
+                <label><span>Category</span><select id="menu-category-select" name="category" required></select></label>
+                <label><span>Price</span><input name="price" type="number" min="0" step="0.01" required /></label>
+                <div class="wide-field manager-ingredient-block">
+                  <span class="field-title">Ingredients</span>
+                  <div id="menu-ingredient-rows" class="stack-layout compact-gap"></div>
+                  <button id="menu-add-ingredient-row" class="ghost-button mini-button" type="button">Add Ingredient</button>
+                </div>
+                <div class="manager-form-actions">
+                  <button class="action-button" type="submit">Add Item</button>
+                </div>
+              </form>
+              <form id="menu-update-form" class="compact-form inline-form">
+                <label><span>Product ID</span><input name="productId" type="number" min="1" readonly required /></label>
+                <label><span>Price</span><input name="price" type="number" min="0" step="0.01" /></label>
+                <label><span>Category</span><select id="menu-update-category-select" name="category"></select></label>
+              </form>
+              <p class="muted-line">Click a product row below to fill the product action form automatically.</p>
+              <p id="manager-menu-status" class="status-text" data-tone="neutral">Menu actions are ready.</p>
+            </section>
+            <section class="content-card"><div id="manager-menu-table"></div></section>
+          </section>
+
+          <section id="manager-tab-inventory" class="stack-layout manager-tab-panel" hidden>
+            <section class="content-card">
+              <p class="section-label">Inventory Actions</p>
+              <h2>Inventory</h2>
+              <div class="button-row">
+                <button id="inventory-refresh" class="ghost-button" type="button">Refresh</button>
+                <button id="inventory-update-quantity" class="ghost-button" type="button">Update Quantity</button>
+                <button id="inventory-update-price" class="ghost-button" type="button">Update Price</button>
+                <button id="inventory-delete" class="ghost-button" type="button">Delete Item</button>
+                <button id="inventory-affected-products" class="ghost-button" type="button">Affected Products</button>
+              </div>
+              <form id="inventory-add-form" class="compact-form manager-form-grid">
+                <label><span>Next Inventory ID</span><input id="inventory-next-id" name="nextId" type="number" readonly /></label>
+                <label><span>Name</span><input name="name" type="text" required /></label>
+                <label><span>Category</span><select id="inventory-category-select" name="category" required></select></label>
+                <label><span>Price</span><input name="price" type="number" min="0" step="0.01" required /></label>
+                <label><span>Quantity</span><input name="quantity" type="number" min="0" required /></label>
+                <div class="manager-form-actions">
+                  <button class="action-button" type="submit">Add Inventory Item</button>
+                </div>
+              </form>
+              <form id="inventory-update-form" class="compact-form inline-form">
+                <label><span>Inventory ID</span><input name="inventoryId" type="number" min="1" readonly required /></label>
+                <label><span>New Quantity</span><input name="quantity" type="number" min="0" /></label>
+                <label><span>New Price</span><input name="price" type="number" min="0" step="0.01" /></label>
+              </form>
+              <p class="muted-line">Click an inventory row below to fill the inventory action form automatically.</p>
+              <p id="manager-inventory-status" class="status-text" data-tone="neutral">Inventory actions are ready.</p>
+            </section>
+            <section class="content-card"><div id="manager-inventory-table"></div></section>
+          </section>
+
+          <section id="manager-tab-employees" class="stack-layout manager-tab-panel" hidden>
+            <section class="content-card">
+              <p class="section-label">Employee Actions</p>
+              <h2>Employees</h2>
+              <div class="button-row">
+                <button id="employees-refresh" class="ghost-button" type="button">Refresh</button>
+                <button id="employees-update-role" class="ghost-button" type="button">Update Role</button>
+                <button id="employees-delete" class="ghost-button danger-button" type="button">Fire Employee</button>
+              </div>
+              <form id="employee-add-form" class="compact-form">
+                <label><span>ID</span><input name="id" type="number" min="1" required /></label>
+                <label><span>Name</span><input name="name" type="text" required /></label>
+                <label><span>Role</span><input name="role" type="text" placeholder="staff or manager" required /></label>
+                <label><span>Username</span><input name="username" type="text" required /></label>
+                <label><span>Password</span><input name="password" type="text" required /></label>
+                <button class="action-button" type="submit">Add Employee</button>
+              </form>
+              <form id="employee-role-form" class="compact-form inline-form">
+                <label><span>Employee ID</span><input name="employeeId" type="number" min="1" required /></label>
+                <label><span>New Role</span><input name="role" type="text" placeholder="staff or manager" required /></label>
+              </form>
+              <p id="manager-employees-status" class="status-text" data-tone="neutral">Employee actions are ready.</p>
+            </section>
+            <section class="content-card"><div id="manager-employees-table"></div></section>
+          </section>
+        </section>
+      </main>
+
+      <datalist id="inventory-name-options"></datalist>
+    </div>
+
+    <script src="/assets/app.js"></script>
+  </body>
+</html>
