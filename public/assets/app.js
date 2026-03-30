@@ -673,3 +673,633 @@ function populateInventoryDatalist(items) {
     datalist.appendChild(option);
   });
 }
+
+function createIngredientRow(items, selectedId = '', quantity = 1) {
+  const row = document.createElement('div');
+  row.className = 'ingredient-row';
+  row.innerHTML = `
+    <input name="ingredientSearch" list="inventory-name-options" placeholder="Type or pick ingredient" />
+    <input name="quantityUsed" type="number" min="1" value="${quantity}" placeholder="Qty used" />
+    <button class="ghost-button mini-button" type="button">Remove</button>
+  `;
+
+  const searchInput = row.querySelector('[name="ingredientSearch"]');
+  const quantityInput = row.querySelector('[name="quantityUsed"]');
+  const removeButton = row.querySelector('button');
+
+  const applySelection = (selectedItem) => {
+    if (!selectedItem) {
+      row.dataset.ingredientId = '';
+      return;
+    }
+    row.dataset.ingredientId = String(selectedItem.id);
+    searchInput.value = `${selectedItem.id} - ${selectedItem.name}`;
+  };
+
+  if (selectedId) {
+    applySelection(items.find((item) => Number(item.id) === Number(selectedId)));
+  }
+
+  searchInput.addEventListener('input', () => {
+    const raw = searchInput.value.trim();
+    const match = raw.match(/^(\d+)\s*-/);
+    if (match) {
+      applySelection(items.find((item) => Number(item.id) === Number(match[1])) || null);
+      return;
+    }
+
+    const normalized = raw.toLowerCase();
+    const selectedItem = items.find((item) => item.name.toLowerCase() === normalized)
+      || items.find((item) => item.name.toLowerCase().includes(normalized));
+    if (selectedItem) {
+      applySelection(selectedItem);
+      return;
+    }
+
+    row.dataset.ingredientId = '';
+  });
+
+  removeButton.addEventListener('click', () => {
+    row.remove();
+  });
+
+  quantityInput.addEventListener('input', () => {
+    if (Number(quantityInput.value) < 1) {
+      quantityInput.value = '1';
+    }
+  });
+
+  return row;
+}
+function getInputValue(formId, fieldName) {
+  const form = document.getElementById(formId);
+  return form?.elements?.namedItem(fieldName) || null;
+}
+
+function parseIngredientUsageFromRows() {
+  const rows = Array.from(document.querySelectorAll('#menu-ingredient-rows .ingredient-row'));
+  const usage = rows.map((row) => ({
+    ingredientId: Number(row.dataset.ingredientId || 0),
+    quantityUsed: Number(row.querySelector('[name="quantityUsed"]')?.value || 0),
+  })).filter((entry) => entry.ingredientId > 0 && entry.quantityUsed > 0);
+
+  if (!usage.length) {
+    throw new Error('Select at least one valid ingredient before adding a menu item.');
+  }
+
+  return usage;
+}
+function applyMenuSelection(product) {
+  managerState.selectedProductId = Number(product.id);
+  const productField = getInputValue('menu-update-form', 'productId');
+  const priceField = getInputValue('menu-update-form', 'price');
+  const categoryField = getInputValue('menu-update-form', 'category');
+  if (productField) {
+    productField.value = product.id;
+  }
+  if (priceField) {
+    priceField.value = Number(product.rawPrice ?? product.price ?? 0).toFixed(2);
+  }
+  if (categoryField) {
+    categoryField.value = product.category || '';
+  }
+  setStatus('manager-menu-status', `Selected product #${product.id} (${product.name}) for menu actions.`, 'neutral');
+}
+
+function applyInventorySelection(item) {
+  managerState.selectedInventoryId = Number(item.id);
+  const inventoryField = getInputValue('inventory-update-form', 'inventoryId');
+  const quantityField = getInputValue('inventory-update-form', 'quantity');
+  const priceField = getInputValue('inventory-update-form', 'price');
+  if (inventoryField) {
+    inventoryField.value = item.id;
+  }
+  if (quantityField) {
+    quantityField.value = item.quantity ?? '';
+  }
+  if (priceField) {
+    priceField.value = Number(item.rawPrice ?? item.price ?? 0).toFixed(2);
+  }
+  setStatus('manager-inventory-status', `Selected inventory item #${item.id} (${item.name}) for inventory actions.`, 'neutral');
+}
+
+async function populateManagerFormOptions() {
+  const [menuIdData, inventoryIdData, categoriesData, inventoryData] = await Promise.all([
+    fetchJson('/api/menu/next-id'),
+    fetchJson('/api/inventory/next-id'),
+    fetchJson('/api/categories'),
+    fetchJson('/api/inventory'),
+  ]);
+
+  setFieldValue('menu-next-id', String(menuIdData.nextId));
+  setFieldValue('inventory-next-id', String(inventoryIdData.nextId));
+  populateSelect('menu-category-select', categoriesData.items || []);
+  populateSelect('menu-update-category-select', categoriesData.items || [], { includeBlank: true });
+  populateSelect('inventory-category-select', INVENTORY_CATEGORY_OPTIONS);
+  managerState.inventoryItems = inventoryData.items || [];
+  populateInventoryDatalist(managerState.inventoryItems);
+
+  const ingredientRows = document.getElementById('menu-ingredient-rows');
+  if (ingredientRows && !ingredientRows.children.length) {
+    ingredientRows.appendChild(createIngredientRow(managerState.inventoryItems));
+  }
+
+  document.getElementById('menu-add-ingredient-row').onclick = () => {
+    ingredientRows.appendChild(createIngredientRow(managerState.inventoryItems));
+  };
+}
+
+async function refreshManagerSummary() {
+  const [revenueData, inventoryData, productsData] = await Promise.all([
+    fetchJson('/api/revenue'),
+    fetchJson('/api/inventory/low'),
+    fetchJson('/api/products'),
+  ]);
+  setText('manager-revenue-total', formatCurrency(revenueData.totalRevenue));
+  setText('manager-low-count', String((inventoryData.items || []).length));
+  setText('manager-product-count', String((productsData.items || []).length));
+}
+
+async function loadManagerMenuTable() {
+  const includeInactive = document.getElementById('manager-show-inactive').checked;
+  const data = await fetchJson(`/api/menu?includeInactive=${includeInactive}`);
+  managerState.menuItems = data.items || [];
+  renderTable('manager-menu-table', [
+    { key: 'id', label: 'ID' },
+    { key: 'name', label: 'Name' },
+    { key: 'category', label: 'Category' },
+    { key: 'price', label: 'Price' },
+    { key: 'active', label: 'Active' },
+  ], managerState.menuItems.map((item) => ({
+    ...item,
+    rawPrice: item.price,
+    price: formatCurrency(item.price),
+  })), {
+    isSelected: (row) => Number(row.id) === Number(managerState.selectedProductId),
+    onRowClick: applyMenuSelection,
+  });
+}
+
+async function loadManagerInventoryTable() {
+  const data = await fetchJson('/api/inventory');
+  managerState.inventoryItems = data.items || [];
+  populateInventoryDatalist(managerState.inventoryItems);
+  renderTable('manager-inventory-table', [
+    { key: 'id', label: 'ID' },
+    { key: 'name', label: 'Name' },
+    { key: 'category', label: 'Category' },
+    { key: 'price', label: 'Price' },
+    { key: 'quantity', label: 'Quantity' },
+  ], managerState.inventoryItems.map((item) => ({
+    ...item,
+    rawPrice: item.price,
+    price: formatCurrency(item.price),
+  })), {
+    isSelected: (row) => Number(row.id) === Number(managerState.selectedInventoryId),
+    onRowClick: applyInventorySelection,
+  });
+}
+
+async function loadManagerEmployeesTable() {
+  const data = await fetchJson('/api/employees');
+  renderTable('manager-employees-table', [
+    { key: 'id', label: 'ID' },
+    { key: 'name', label: 'Name' },
+    { key: 'role', label: 'Role' },
+    { key: 'username', label: 'Username' },
+  ], data.items || []);
+}
+
+async function runReportTotalRevenue() {
+  const data = await fetchJson('/api/revenue');
+  renderTable('manager-report-table', [
+    { key: 'metric', label: 'Metric' },
+    { key: 'value', label: 'Value' },
+  ], [{ metric: 'Total Revenue', value: formatCurrency(data.totalRevenue) }]);
+  setStatus('manager-reports-status', 'Loaded total revenue report.', 'success');
+}
+
+async function runReportLowInventory() {
+  const data = await fetchJson('/api/inventory/low');
+  renderTable('manager-report-table', [
+    { key: 'id', label: 'ID' },
+    { key: 'name', label: 'Name' },
+    { key: 'quantity', label: 'Quantity' },
+  ], data.items || []);
+  setStatus('manager-reports-status', 'Loaded low inventory report.', 'success');
+}
+
+async function runReportMostOrdered() {
+  const data = await fetchJson('/api/reports/most-ordered?limit=8');
+  renderMostOrderedReport(data.items || []);
+  setStatus('manager-reports-status', 'Loaded most ordered items report.', 'success');
+}
+
+async function runReportX() {
+  const data = await fetchJson('/api/reports/x');
+  renderTable('manager-report-table', [
+    { key: 'hourLabel', label: 'Hour' },
+    { key: 'salesLabel', label: 'Sales' },
+    { key: 'voidsLabel', label: 'Voids' },
+    { key: 'creditLabel', label: 'Credit Card' },
+    { key: 'debitLabel', label: 'Debit Card' },
+    { key: 'giftLabel', label: 'Gift Card' },
+    { key: 'cashLabel', label: 'Cash' },
+  ], (data.today || []).map((item) => ({
+    hourLabel: `${String(item.hour).padStart(2, '0')}:00`,
+    salesLabel: formatCurrency(item.sales),
+    voidsLabel: formatCurrency(item.voids),
+    creditLabel: formatCurrency(item.creditCard),
+    debitLabel: formatCurrency(item.debitCard),
+    giftLabel: formatCurrency(item.giftCard),
+    cashLabel: formatCurrency(item.cash),
+  })));
+  setStatus('manager-reports-status', 'Loaded X-report (today).', 'success');
+}
+
+async function runReportInventoryUsage(form) {
+  const formData = new FormData(form);
+  const params = new URLSearchParams({
+    startDate: formData.get('startDate'),
+    endDate: formData.get('endDate'),
+    limit: formData.get('limit'),
+  });
+  const data = await fetchJson(`/api/reports/inventory-usage?${params}`);
+  renderTable('manager-report-table', [
+    { key: 'id', label: 'Inventory ID' },
+    { key: 'name', label: 'Ingredient' },
+    { key: 'unitsUsed', label: 'Units Used' },
+  ], data.items || []);
+  setStatus('manager-reports-status', 'Loaded inventory usage report.', 'success');
+}
+
+async function bootManager() {
+  const session = getRoleSession();
+  if (session && session.role === 'manager') {
+    showManagerWorkspace(session);
+    await loadManagerWorkspace();
+  }
+
+  document.querySelectorAll('[data-manager-tab]').forEach((button) => {
+    button.addEventListener('click', () => setManagerTab(button.dataset.managerTab));
+  });
+  setManagerTab('reports');
+
+  const form = document.getElementById('manager-login-form');
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    setStatus('manager-login-status', 'Checking manager credentials...', 'neutral');
+    const formData = new FormData(form);
+
+    try {
+      const result = await fetchJson('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: formData.get('username'),
+          password: formData.get('password'),
+          role: 'manager',
+        }),
+      });
+      saveRoleSession(result);
+      showManagerWorkspace(result);
+      setStatus('manager-login-status', `Signed in as ${result.name || result.username}.`, 'success');
+      await loadManagerWorkspace();
+    } catch (error) {
+      setStatus('manager-login-status', error.message, 'error');
+    }
+  });
+
+  document.getElementById('manager-sign-out').addEventListener('click', () => {
+    clearRoleSession();
+    window.location.replace('/');
+  });
+
+  document.getElementById('report-total-revenue').addEventListener('click', () => runReportWithStatus(runReportTotalRevenue));
+  document.getElementById('report-low-inventory').addEventListener('click', () => runReportWithStatus(runReportLowInventory));
+  document.getElementById('report-most-ordered').addEventListener('click', () => runReportWithStatus(runReportMostOrdered));
+  document.getElementById('report-x').addEventListener('click', () => runReportWithStatus(runReportX));
+  document.getElementById('inventory-usage-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    await runReportWithStatus(() => runReportInventoryUsage(event.currentTarget));
+  });
+
+  document.getElementById('report-z').addEventListener('click', async () => {
+    const employeeSignature = window.prompt('Closing staff signature:');
+    if (!employeeSignature) return;
+    const managerSignature = window.prompt('Manager signature:');
+    if (!managerSignature) return;
+    try {
+      const result = await fetchJson('/api/reports/z', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ employeeSignature, managerSignature }),
+      });
+      renderTable('manager-report-table', [
+        { key: 'metric', label: 'Metric' },
+        { key: 'value', label: 'Value' },
+      ], [
+        { metric: 'Run Date', value: result.report.runDate },
+        { metric: 'Employee Signature', value: result.report.employeeSignature },
+        { metric: 'Manager Signature', value: result.report.managerSignature },
+        { metric: 'Sales', value: formatCurrency(result.report.sales) },
+        { metric: 'Tax', value: formatCurrency(result.report.tax) },
+        { metric: 'Voids', value: formatCurrency(result.report.voids) },
+        { metric: 'Credit Card', value: formatCurrency(result.report.creditCard) },
+        { metric: 'Debit Card', value: formatCurrency(result.report.debitCard) },
+        { metric: 'Gift Card', value: formatCurrency(result.report.giftCard) },
+        { metric: 'Cash', value: formatCurrency(result.report.cash) },
+        { metric: 'Discounts', value: formatCurrency(result.report.discounts) },
+        { metric: 'Service Charges', value: formatCurrency(result.report.serviceCharges) },
+        { metric: 'Total Cash', value: formatCurrency(result.report.totalCash) },
+        { metric: 'Total Sales', value: formatCurrency(result.report.totalSales) },
+      ]);
+      setStatus('manager-reports-status', 'Z-report updated and X-totals reset.', 'success');
+      await refreshManagerSummary();
+    } catch (error) {
+      setStatus('manager-reports-status', error.message, 'error');
+    }
+  });
+
+  document.getElementById('report-reset-z').addEventListener('click', async () => {
+    try {
+      const result = await fetchJson('/api/reports/reset-z', { method: 'POST' });
+      renderTable('manager-report-table', [
+        { key: 'status', label: 'Status' },
+        { key: 'details', label: 'Details' },
+      ], [{ status: result.reset ? 'Success' : 'Info', details: result.reset ? 'Today\'s Z-report was reset.' : 'No Z-report existed for today. X-report totals were reset.' }]);
+      setStatus('manager-reports-status', 'Z-report reset complete.', 'success');
+      await refreshManagerSummary();
+    } catch (error) {
+      setStatus('manager-reports-status', error.message, 'error');
+    }
+  });
+
+  document.getElementById('manager-show-inactive').addEventListener('change', () => runManagerAction(loadManagerMenuTable, 'manager-menu-status', 'Menu table refreshed.'));
+  document.getElementById('menu-refresh').addEventListener('click', () => runManagerAction(loadManagerMenuTable, 'manager-menu-status', 'Menu table refreshed.'));
+
+  document.getElementById('menu-update-price').addEventListener('click', async () => {
+    const data = new FormData(document.getElementById('menu-update-form'));
+    await runManagerAction(async () => {
+      await fetchJson('/api/menu/price', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId: data.get('productId'), price: data.get('price') }),
+      });
+      await loadManagerMenuTable();
+    }, 'manager-menu-status', 'Product price updated.');
+  });
+
+  document.getElementById('menu-update-category').addEventListener('click', async () => {
+    const data = new FormData(document.getElementById('menu-update-form'));
+    await runManagerAction(async () => {
+      await fetchJson('/api/menu/category', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId: data.get('productId'), category: data.get('category') }),
+      });
+      await loadManagerMenuTable();
+    }, 'manager-menu-status', 'Product category updated.');
+  });
+
+  document.getElementById('menu-deactivate').addEventListener('click', async () => {
+    const data = new FormData(document.getElementById('menu-update-form'));
+    await runManagerAction(async () => {
+      await fetchJson('/api/menu/deactivate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId: data.get('productId') }),
+      });
+      await loadManagerMenuTable();
+    }, 'manager-menu-status', 'Product hidden (inactive).');
+  });
+
+  document.getElementById('menu-reactivate').addEventListener('click', async () => {
+    const data = new FormData(document.getElementById('menu-update-form'));
+    await runManagerAction(async () => {
+      await fetchJson('/api/menu/reactivate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId: data.get('productId') }),
+      });
+      await loadManagerMenuTable();
+    }, 'manager-menu-status', 'Product reactivated.');
+  });
+
+  document.getElementById('menu-add-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    await runManagerAction(async () => {
+      await fetchJson('/api/menu', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: data.get('name'),
+          category: data.get('category'),
+          price: data.get('price'),
+          ingredientUsage: parseIngredientUsageFromRows(),
+        }),
+      });
+      form.reset();
+      document.getElementById('menu-ingredient-rows').innerHTML = '';
+      await populateManagerFormOptions();
+      await loadManagerMenuTable();
+    }, 'manager-menu-status', 'Menu item added.');
+  });
+
+  document.getElementById('inventory-refresh').addEventListener('click', () => runManagerAction(loadManagerInventoryTable, 'manager-inventory-status', 'Inventory table refreshed.'));
+
+  document.getElementById('inventory-update-quantity').addEventListener('click', async () => {
+    const data = new FormData(document.getElementById('inventory-update-form'));
+    await runManagerAction(async () => {
+      await fetchJson('/api/inventory/quantity', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inventoryId: data.get('inventoryId'), quantity: data.get('quantity') }),
+      });
+      await loadManagerInventoryTable();
+    }, 'manager-inventory-status', 'Inventory quantity updated.');
+  });
+
+  document.getElementById('inventory-update-price').addEventListener('click', async () => {
+    const data = new FormData(document.getElementById('inventory-update-form'));
+    await runManagerAction(async () => {
+      await fetchJson('/api/inventory/price', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inventoryId: data.get('inventoryId'), price: data.get('price') }),
+      });
+      await loadManagerInventoryTable();
+    }, 'manager-inventory-status', 'Inventory price updated.');
+  });
+
+  document.getElementById('inventory-delete').addEventListener('click', async () => {
+    const data = new FormData(document.getElementById('inventory-update-form'));
+    await runManagerAction(async () => {
+      await fetchJson(`/api/inventory?inventoryId=${data.get('inventoryId')}`, { method: 'DELETE' });
+      await loadManagerInventoryTable();
+    }, 'manager-inventory-status', 'Inventory item deleted.');
+  });
+
+  document.getElementById('inventory-affected-products').addEventListener('click', async () => {
+    const data = new FormData(document.getElementById('inventory-update-form'));
+    try {
+      const result = await fetchJson(`/api/inventory/affected-products?inventoryId=${data.get('inventoryId')}`);
+      renderTable('manager-report-table', [{ key: 'name', label: 'Affected Products' }], (result.items || []).map((name) => ({ name })));
+      setStatus('manager-inventory-status', 'Affected products loaded into the report panel.', 'success');
+      setManagerTab('reports');
+    } catch (error) {
+      setStatus('manager-inventory-status', error.message, 'error');
+    }
+  });
+
+  document.getElementById('inventory-add-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    await runManagerAction(async () => {
+      await fetchJson('/api/inventory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: data.get('name'),
+          category: data.get('category'),
+          price: data.get('price'),
+          quantity: data.get('quantity'),
+        }),
+      });
+      form.reset();
+      await populateManagerFormOptions();
+      await loadManagerInventoryTable();
+    }, 'manager-inventory-status', 'Inventory item added.');
+  });
+
+  document.getElementById('employees-refresh').addEventListener('click', () => runManagerAction(loadManagerEmployeesTable, 'manager-employees-status', 'Employees table refreshed.'));
+  document.getElementById('employees-update-role').addEventListener('click', async () => {
+    const data = new FormData(document.getElementById('employee-role-form'));
+    await runManagerAction(async () => {
+      await fetchJson('/api/employees/role', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ employeeId: data.get('employeeId'), role: data.get('role') }),
+      });
+      await loadManagerEmployeesTable();
+    }, 'manager-employees-status', 'Employee role updated.');
+  });
+
+  document.getElementById('employees-delete').addEventListener('click', async () => {
+    const data = new FormData(document.getElementById('employee-role-form'));
+    await runManagerAction(async () => {
+      await fetchJson(`/api/employees?employeeId=${data.get('employeeId')}`, { method: 'DELETE' });
+      await loadManagerEmployeesTable();
+    }, 'manager-employees-status', 'Employee terminated.');
+  });
+
+  document.getElementById('employee-add-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    await runManagerAction(async () => {
+      await fetchJson('/api/employees', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: data.get('id'),
+          name: data.get('name'),
+          role: data.get('role'),
+          username: data.get('username'),
+          password: data.get('password'),
+        }),
+      });
+      form.reset();
+      await loadManagerEmployeesTable();
+    }, 'manager-employees-status', 'Employee added.');
+  });
+}
+
+async function runReportWithStatus(action) {
+  try {
+    setStatus('manager-reports-status', 'Loading report...', 'neutral');
+    await action();
+  } catch (error) {
+    setStatus('manager-reports-status', error.message, 'error');
+  }
+}
+
+async function runManagerAction(action, statusId, successMessage) {
+  try {
+    setStatus(statusId, 'Running action...', 'neutral');
+    await action();
+    await refreshManagerSummary();
+    setStatus(statusId, successMessage, 'success');
+  } catch (error) {
+    setStatus(statusId, error.message, 'error');
+  }
+}
+
+function showManagerWorkspace(session) {
+  document.getElementById('manager-login-card').hidden = true;
+  document.getElementById('manager-workspace').hidden = false;
+  setText('manager-session-name', session.name || session.username || 'Manager');
+}
+
+async function loadManagerWorkspace() {
+  setStatus('manager-dashboard-status', 'Loading live manager data...', 'neutral');
+  await Promise.all([
+    refreshManagerSummary(),
+    populateManagerFormOptions(),
+    loadManagerMenuTable(),
+    loadManagerInventoryTable(),
+    loadManagerEmployeesTable(),
+    runReportTotalRevenue(),
+  ]);
+  setStatus('manager-dashboard-status', 'Manager workspace synced with the live database.', 'success');
+}
+
+async function bootCustomer() {
+  renderList('customer-features', [
+    'Portal-driven entry path is already in place.',
+    'Customer page can reuse the shared product catalog immediately.',
+    'Next step is building cart and customization controls on top of /api/products.',
+    'Online checkout should stay behind the write flag until fully ported.',
+  ]);
+
+  const data = await fetchJson('/api/products');
+  renderSimpleProducts('customer-products', (data.items || []).slice(0, 6));
+}
+
+async function boot() {
+  const page = document.body.dataset.page;
+  if (!requirePortalAccess(page)) {
+    return;
+  }
+
+  try {
+    if (page === 'portal') {
+      await bootPortal();
+      return;
+    }
+    if (page === 'staff') {
+      await bootStaff();
+      return;
+    }
+    if (page === 'manager') {
+      await bootManager();
+      return;
+    }
+    if (page === 'customer') {
+      await bootCustomer();
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    ['portal-summary', 'staff-products-status', 'staff-login-status', 'staff-preview-status', 'manager-login-status', 'manager-dashboard-status'].forEach((id) => {
+      const element = document.getElementById(id);
+      if (element) {
+        element.textContent = message;
+      }
+    });
+  }
+}
+
+boot();
