@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Customer Portal</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+  </head>
+  <body data-page="staff">
+    <div class="page-shell inner-page">
+      <nav class="top-nav">
+        <a href="/">Portal</a>
+      </nav>
+
+      <header class="page-header">
+        <p class="eyebrow">Customer Interface</p>
+      </header>
+
+      <main class="stack-layout">
+        <section id="staff-workspace" class="stack-layout" hidden>
+          <section class="content-card">
+            <div class="section-heading">
+              <div>
+                <p class="section-label">Signed In</p>
+                <h2 id="staff-session-name">Customer User</h2>
+                <p class="muted-line">Role: <span id="staff-session-role">customer</span></p>
+              </div>
+              <button id="staff-sign-out" class="ghost-button" type="button">Exit to Portal</button>
+            </div>
+            <ul id="staff-features" class="feature-list"></ul>
+          </section>
+
+          <section class="two-column">
+            <section class="content-card">
+              <div class="section-heading">
+                <div>
+                  <p class="section-label">Live Menu</p>
+                  <h2>Choose a product</h2>
+                </div>
+                <div class="toolbar">
+                  <select id="staff-category-filter"></select>
+                  <span id="staff-product-count" class="toolbar-note"></span>
+                </div>
+              </div>
+              <p id="staff-products-status" class="status-text" data-tone="neutral">Waiting for product data...</p>
+              <div id="staff-products" class="product-list"></div>
+            </section>
+
+            <section class="content-card">
+              <p class="section-label">Customization</p>
+              <h2 id="staff-selected-product">Select a product to customize</h2>
+              <p class="muted-line" id="staff-selected-price">Base price will appear here.</p>
+
+              <div class="stack-layout compact-gap">
+                <label class="field-block">
+                  <span>Quantity</span>
+                  <input id="staff-qty" class="numeric-input" type="number" min="1" value="1" />
+                </label>
+
+                <label class="field-block">
+                  <span>Size</span>
+                  <select id="staff-size">
+                    <option>Small</option>
+                    <option selected>Medium</option>
+                    <option>Large</option>
+                  </select>
+                </label>
+
+                <label class="field-block">
+                  <span>Sugar Level</span>
+                  <div class="range-line">
+                    <input id="staff-sugar" type="range" min="0" max="100" step="20" value="100" />
+                    <strong id="staff-sugar-value">100%</strong>
+                  </div>
+                </label>
+
+                <fieldset class="field-block check-fieldset">
+                  <legend>Toppings</legend>
+                  <div class="check-grid">
+                    <label><input type="checkbox" name="staff-topping" value="Boba" /> Boba</label>
+                    <label><input type="checkbox" name="staff-topping" value="Lychee Jelly" /> Lychee Jelly</label>
+                    <label><input type="checkbox" name="staff-topping" value="Pudding" /> Pudding</label>
+                    <label><input type="checkbox" name="staff-topping" value="Crystal Boba" /> Crystal Boba</label>
+                  </div>
+                </fieldset>
+
+                <button id="staff-add-to-cart" class="action-button" type="button">Add To Cart</button>
+                <p id="staff-cart-status" class="status-text" data-tone="neutral">
+                  Select a menu item, adjust the options, then add it to the cart.
+                </p>
+              </div>
+            </section>
+          </section>
+
+          <section class="two-column cart-layout">
+            <section class="content-card">
+              <p class="section-label">Cart</p>
+              <h2>Current order</h2>
+              <div id="staff-cart-lines" class="cart-list"></div>
+            </section>
+
+            <section class="content-card">
+              <p class="section-label">Order Preview</p>
+              <h2>Totals and payment</h2>
+              <div class="summary-grid">
+                <div><span>Subtotal</span><strong id="staff-subtotal">$0.00</strong></div>
+                <div><span>Tax</span><strong id="staff-tax">$0.00</strong></div>
+                <div><span>Total</span><strong id="staff-total">$0.00</strong></div>
+              </div>
+
+              <div class="checkout-grid">
+                <label class="field-block">
+                  <span>Primary Payment</span>
+                  <select id="staff-payment-primary">
+                    <option>Cash</option>
+                    <option>Credit Card</option>
+                    <option>Debit Card</option>
+                    <option>Gift Card</option>
+                  </select>
+                </label>
+                <label class="field-block">
+                  <span>Secondary Payment</span>
+                  <select id="staff-payment-secondary">
+                    <option value="">None</option>
+                    <option>Cash</option>
+                    <option>Credit Card</option>
+                    <option>Debit Card</option>
+                  </select>
+                </label>
+                <label class="field-block">
+                  <span>Gift Amount</span>
+                  <input id="staff-gift-amount" class="numeric-input" type="number" min="0" step="0.01" value="0" />
+                </label>
+                <label class="field-block">
+                  <span>Cash Received</span>
+                  <input id="staff-cash-received" class="numeric-input" type="number" min="0" step="0.01" value="0" />
+                </label>
+              </div>
+
+              <div class="button-row">
+                <button id="staff-preview-order" class="ghost-button" type="button">Refresh Preview</button>
+                <button id="staff-submit-order" class="action-button" type="button">Submit Order</button>
+              </div>
+
+              <p id="staff-preview-status" class="status-text" data-tone="neutral">
+                Cart totals and inventory warnings will appear here.
+              </p>
+              <ul id="staff-shortages" class="feature-list"></ul>
+            </section>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <script src="/assets/app.js"></script>
+  </body>
+</html>
