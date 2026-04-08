@@ -20,6 +20,7 @@
         <section id="manager-login-card" class="content-card auth-card">
           <p class="section-label">Step 1</p>
           <h2>Authenticate for manager access</h2>
+          
           <form id="manager-login-form" class="auth-form">
             <label>
               <span>Username</span>
@@ -31,6 +32,40 @@
             </label>
             <button class="action-button" type="submit">Sign In</button>
           </form>
+
+          <div style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 15px; width: 100%; display: flex; flex-direction: column; align-items: center;">
+            
+            <p style="
+              text-align: center !important; 
+              margin: 0 0 15px 0 !important; 
+              font-size: 0.8rem; 
+              color: #666; 
+              width: 100%;
+              display: block;
+            ">— OR —</p>
+            
+            <div style="display: flex; justify-content: center; width: 100%;">
+              <button 
+                type="button" 
+                class="action-button" 
+                style="
+                  background-color: #fff !important; 
+                  color: #444 !important; 
+                  border: 1px solid #ddd !important; 
+                  width: 240px !important; 
+                  margin: 0 !important; 
+                  display: block !important;
+                  float: none !important;
+                  transform: none !important;
+                  padding: 10px 0 !important;
+                "
+                onclick="window.location.href='/auth/google'"
+              >
+                Sign in with Google
+              </button>
+            </div>
+          </div>
+
           <p id="manager-login-status" class="status-text" data-tone="neutral">
             Use a manager account from the employees table.
           </p>

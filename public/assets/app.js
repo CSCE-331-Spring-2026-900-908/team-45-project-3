@@ -355,28 +355,34 @@ async function bootPortal() {
 }
 
 async function bootStaff() {
-  renderList('staff-features', [
-    'Portal-only entry enforced on the client side.',
-    'Staff and manager users can authenticate into cashier mode.',
-    'Size, sugar, toppings, cart preview, and database-backed totals are now interactive.',
-    'Submit Order will work once ENABLE_DB_WRITES=true is set on the backend.',
-  ]);
+  // 1. Check for local session
+  let session = getRoleSession();
 
-  document.getElementById('staff-sugar').addEventListener('input', (event) => {
-    setText('staff-sugar-value', `${event.target.value}%`);
-  });
+  // 2. Check for Google OAuth session if no local session exists
+  if (!session) {
+    try {
+      const status = await fetchJson('/api/auth/status');
+      // Staff login allows both 'staff' and 'manager' roles to enter
+      if (status.authenticated && (status.role === 'staff' || status.role === 'manager')) {
+        session = status;
+        saveRoleSession(session);
+      }
+    } catch (e) {
+      console.log("No active Google session for staff.");
+    }
+  }
 
-  const session = getRoleSession();
+  // 3. Unlock workspace if authenticated
   if (session && (session.role === 'staff' || session.role === 'manager')) {
     showStaffWorkspace(session);
     await loadStaffProducts();
   }
 
+  // 4. Manual Login Form Handler
   const form = document.getElementById('staff-login-form');
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     setStatus('staff-login-status', 'Checking staff credentials...', 'neutral');
-
     const formData = new FormData(form);
     try {
       const result = await fetchJson('/api/auth/login', {
@@ -388,19 +394,24 @@ async function bootStaff() {
           role: 'staff',
         }),
       });
-
       saveRoleSession(result);
       showStaffWorkspace(result);
-      setStatus('staff-login-status', `Signed in as ${result.name || result.username} (${result.role}).`, 'success');
+      setStatus('staff-login-status', `Signed in as ${result.name || result.username}.`, 'success');
       await loadStaffProducts();
     } catch (error) {
       setStatus('staff-login-status', error.message, 'error');
     }
   });
 
+  // 5. Sign Out & Navigation
   document.getElementById('staff-sign-out').addEventListener('click', () => {
     clearRoleSession();
     window.location.replace('/');
+  });
+
+  // 6. UI Interaction Handlers
+  document.getElementById('staff-sugar').addEventListener('input', (event) => {
+    setText('staff-sugar-value', `${event.target.value}%`);
   });
 
   document.getElementById('staff-add-to-cart').addEventListener('click', async () => {
@@ -409,14 +420,12 @@ async function bootStaff() {
       setStatus('staff-cart-status', 'Select a product before adding to the cart.', 'error');
       return;
     }
-
     const customization = readCustomizationForm();
     const existing = staffState.cart.find((line) => line.productId === product.id && customizationMatches(line, customization));
     if (existing) {
       existing.quantity += customization.quantity;
       existing.lineTotal = Number((existing.unitPrice * existing.quantity).toFixed(2));
     } else {
-      const unitPrice = Number(product.price);
       staffState.cart.push({
         productId: product.id,
         name: product.name,
@@ -425,39 +434,29 @@ async function bootStaff() {
         size: customization.size,
         sugarPercent: customization.sugarPercent,
         toppings: customization.toppings,
-        unitPrice,
-        lineTotal: Number((unitPrice * customization.quantity).toFixed(2)),
+        unitPrice: Number(product.price),
+        lineTotal: Number((Number(product.price) * customization.quantity).toFixed(2)),
       });
     }
-
     resetCustomizationForm();
     renderCart();
-    setStatus('staff-cart-status', `${product.name} added to the cart.`, 'success');
     await refreshPreview();
   });
 
   document.getElementById('staff-preview-order').addEventListener('click', refreshPreview);
   document.getElementById('staff-submit-order').addEventListener('click', async () => {
-    if (!staffState.cart.length) {
-      setStatus('staff-preview-status', 'Add at least one item before submitting the order.', 'error');
-      return;
-    }
-
+    if (!staffState.cart.length) return;
     try {
-      const result = await fetchJson('/api/orders', {
+      await fetchJson('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items: staffState.cart.map(toOrderPayload),
-          payment: buildPaymentPayload(),
-        }),
+        body: JSON.stringify({ items: staffState.cart.map(toOrderPayload), payment: buildPaymentPayload() }),
       });
-
       staffState.cart = [];
       staffState.preview = { ...EMPTY_PREVIEW };
       renderCart();
       renderPreview();
-      setStatus('staff-preview-status', `Order submitted successfully. Payment record ${result.result.paymentRecordId}.`, 'success');
+      setStatus('staff-preview-status', 'Order submitted successfully.', 'success');
     } catch (error) {
       setStatus('staff-preview-status', error.message, 'error');
     }
@@ -934,17 +933,37 @@ async function runReportInventoryUsage(form) {
 }
 
 async function bootManager() {
-  const session = getRoleSession();
+  // 1. Check for an existing local session
+  let session = getRoleSession();
+
+  // 2. If no local session, check the server for a Google OAuth session
+  if (!session) {
+    try {
+      const status = await fetchJson('/api/auth/status');
+      // Verify they are authenticated and have the correct manager role
+      if (status.authenticated && status.role === 'manager') {
+        session = status;
+        saveRoleSession(session); // Save to sessionStorage so it persists on refresh
+      }
+    } catch (e) {
+      // Not logged in via Google, or server error - fallback to login form
+      console.log("No active Google session found.");
+    }
+  }
+
+  // 3. If we have a valid session (from either method), show the workspace
   if (session && session.role === 'manager') {
     showManagerWorkspace(session);
     await loadManagerWorkspace();
   }
 
+  // 4. Attach event listeners for the tab system
   document.querySelectorAll('[data-manager-tab]').forEach((button) => {
     button.addEventListener('click', () => setManagerTab(button.dataset.managerTab));
   });
   setManagerTab('reports');
 
+  // 5. Handle the manual (Username/Password) Login Form
   const form = document.getElementById('manager-login-form');
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -970,11 +989,14 @@ async function bootManager() {
     }
   });
 
+  // 6. Handle Sign Out
   document.getElementById('manager-sign-out').addEventListener('click', () => {
     clearRoleSession();
+    // Also redirect to a logout route if you want to clear the Google session server-side
     window.location.replace('/');
   });
 
+  // 7. Attach Report Handlers
   document.getElementById('report-total-revenue').addEventListener('click', () => runReportWithStatus(runReportTotalRevenue));
   document.getElementById('report-low-inventory').addEventListener('click', () => runReportWithStatus(runReportLowInventory));
   document.getElementById('report-most-ordered').addEventListener('click', () => runReportWithStatus(runReportMostOrdered));
@@ -984,6 +1006,7 @@ async function bootManager() {
     await runReportWithStatus(() => runReportInventoryUsage(event.currentTarget));
   });
 
+  // 8. Attach Z-Report Handler
   document.getElementById('report-z').addEventListener('click', async () => {
     const employeeSignature = window.prompt('Closing staff signature:');
     if (!employeeSignature) return;
@@ -1021,6 +1044,7 @@ async function bootManager() {
     }
   });
 
+  // 9. Attach Reset Z-Report Handler
   document.getElementById('report-reset-z').addEventListener('click', async () => {
     try {
       const result = await fetchJson('/api/reports/reset-z', { method: 'POST' });
@@ -1035,6 +1059,7 @@ async function bootManager() {
     }
   });
 
+  // 10. Attach Menu Actions
   document.getElementById('manager-show-inactive').addEventListener('change', () => runManagerAction(loadManagerMenuTable, 'manager-menu-status', 'Menu table refreshed.'));
   document.getElementById('menu-refresh').addEventListener('click', () => runManagerAction(loadManagerMenuTable, 'manager-menu-status', 'Menu table refreshed.'));
 
@@ -1108,6 +1133,7 @@ async function bootManager() {
     }, 'manager-menu-status', 'Menu item added.');
   });
 
+  // 11. Attach Inventory Actions
   document.getElementById('inventory-refresh').addEventListener('click', () => runManagerAction(loadManagerInventoryTable, 'manager-inventory-status', 'Inventory table refreshed.'));
 
   document.getElementById('inventory-update-quantity').addEventListener('click', async () => {
@@ -1175,6 +1201,7 @@ async function bootManager() {
     }, 'manager-inventory-status', 'Inventory item added.');
   });
 
+  // 12. Attach Employee Actions
   document.getElementById('employees-refresh').addEventListener('click', () => runManagerAction(loadManagerEmployeesTable, 'manager-employees-status', 'Employees table refreshed.'));
   document.getElementById('employees-update-role').addEventListener('click', async () => {
     const data = new FormData(document.getElementById('employee-role-form'));
@@ -1301,5 +1328,31 @@ async function boot() {
     });
   }
 }
+
+document.getElementById('login-form')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  
+  const payload = {
+    username: document.getElementById('username').value,
+    password: document.getElementById('password').value,
+    role: document.getElementById('role').value
+  };
+
+  const response = await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+
+  const result = await response.json();
+
+  if (response.ok && result.authenticated) {
+    document.getElementById('login-message').innerText = `Welcome, ${result.name}!`;
+    // Redirect based on role
+    window.location.href = `/${result.role}`;
+  } else {
+    document.getElementById('login-message').innerText = "Login failed. Please check your credentials.";
+  }
+});
 
 boot();
