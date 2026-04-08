@@ -355,28 +355,34 @@ async function bootPortal() {
 }
 
 async function bootStaff() {
-  renderList('staff-features', [
-    'Portal-only entry enforced on the client side.',
-    'Staff and manager users can authenticate into cashier mode.',
-    'Size, sugar, toppings, cart preview, and database-backed totals are now interactive.',
-    'Submit Order will work once ENABLE_DB_WRITES=true is set on the backend.',
-  ]);
+  // 1. Check for local session
+  let session = getRoleSession();
 
-  document.getElementById('staff-sugar').addEventListener('input', (event) => {
-    setText('staff-sugar-value', `${event.target.value}%`);
-  });
+  // 2. Check for Google OAuth session if no local session exists
+  if (!session) {
+    try {
+      const status = await fetchJson('/api/auth/status');
+      // Staff login allows both 'staff' and 'manager' roles to enter
+      if (status.authenticated && (status.role === 'staff' || status.role === 'manager')) {
+        session = status;
+        saveRoleSession(session);
+      }
+    } catch (e) {
+      console.log("No active Google session for staff.");
+    }
+  }
 
-  const session = getRoleSession();
+  // 3. Unlock workspace if authenticated
   if (session && (session.role === 'staff' || session.role === 'manager')) {
     showStaffWorkspace(session);
     await loadStaffProducts();
   }
 
+  // 4. Manual Login Form Handler
   const form = document.getElementById('staff-login-form');
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     setStatus('staff-login-status', 'Checking staff credentials...', 'neutral');
-
     const formData = new FormData(form);
     try {
       const result = await fetchJson('/api/auth/login', {
@@ -388,19 +394,24 @@ async function bootStaff() {
           role: 'staff',
         }),
       });
-
       saveRoleSession(result);
       showStaffWorkspace(result);
-      setStatus('staff-login-status', `Signed in as ${result.name || result.username} (${result.role}).`, 'success');
+      setStatus('staff-login-status', `Signed in as ${result.name || result.username}.`, 'success');
       await loadStaffProducts();
     } catch (error) {
       setStatus('staff-login-status', error.message, 'error');
     }
   });
 
+  // 5. Sign Out & Navigation
   document.getElementById('staff-sign-out').addEventListener('click', () => {
     clearRoleSession();
     window.location.replace('/');
+  });
+
+  // 6. UI Interaction Handlers
+  document.getElementById('staff-sugar').addEventListener('input', (event) => {
+    setText('staff-sugar-value', `${event.target.value}%`);
   });
 
   document.getElementById('staff-add-to-cart').addEventListener('click', async () => {
@@ -409,14 +420,12 @@ async function bootStaff() {
       setStatus('staff-cart-status', 'Select a product before adding to the cart.', 'error');
       return;
     }
-
     const customization = readCustomizationForm();
     const existing = staffState.cart.find((line) => line.productId === product.id && customizationMatches(line, customization));
     if (existing) {
       existing.quantity += customization.quantity;
       existing.lineTotal = Number((existing.unitPrice * existing.quantity).toFixed(2));
     } else {
-      const unitPrice = Number(product.price);
       staffState.cart.push({
         productId: product.id,
         name: product.name,
@@ -425,39 +434,29 @@ async function bootStaff() {
         size: customization.size,
         sugarPercent: customization.sugarPercent,
         toppings: customization.toppings,
-        unitPrice,
-        lineTotal: Number((unitPrice * customization.quantity).toFixed(2)),
+        unitPrice: Number(product.price),
+        lineTotal: Number((Number(product.price) * customization.quantity).toFixed(2)),
       });
     }
-
     resetCustomizationForm();
     renderCart();
-    setStatus('staff-cart-status', `${product.name} added to the cart.`, 'success');
     await refreshPreview();
   });
 
   document.getElementById('staff-preview-order').addEventListener('click', refreshPreview);
   document.getElementById('staff-submit-order').addEventListener('click', async () => {
-    if (!staffState.cart.length) {
-      setStatus('staff-preview-status', 'Add at least one item before submitting the order.', 'error');
-      return;
-    }
-
+    if (!staffState.cart.length) return;
     try {
-      const result = await fetchJson('/api/orders', {
+      await fetchJson('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items: staffState.cart.map(toOrderPayload),
-          payment: buildPaymentPayload(),
-        }),
+        body: JSON.stringify({ items: staffState.cart.map(toOrderPayload), payment: buildPaymentPayload() }),
       });
-
       staffState.cart = [];
       staffState.preview = { ...EMPTY_PREVIEW };
       renderCart();
       renderPreview();
-      setStatus('staff-preview-status', `Order submitted successfully. Payment record ${result.result.paymentRecordId}.`, 'success');
+      setStatus('staff-preview-status', 'Order submitted successfully.', 'success');
     } catch (error) {
       setStatus('staff-preview-status', error.message, 'error');
     }
