@@ -31,6 +31,19 @@
             </label>
             <button class="action-button" type="submit">Sign In</button>
           </form>
+
+          <div style="margin-top: 20px; text-align: center; border-top: 1px solid #eee; padding-top: 15px;">
+            <p style="margin-bottom: 10px; font-size: 0.8rem; color: #666;">— OR —</p>
+            <button 
+              type="button" 
+              class="action-button" 
+              style="background-color: #fff; color: #444; border: 1px solid #ddd; display: inline-block; width: auto; padding: 10px 20px;"
+              onclick="window.location.href='/auth/google'"
+            >
+              Sign in with Google
+            </button>
+          </div>
+
           <p id="staff-login-status" class="status-text" data-tone="neutral">
             Use an employee account from the shared database.
           </p>

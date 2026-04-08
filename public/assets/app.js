@@ -934,17 +934,37 @@ async function runReportInventoryUsage(form) {
 }
 
 async function bootManager() {
-  const session = getRoleSession();
+  // 1. Check for an existing local session
+  let session = getRoleSession();
+
+  // 2. If no local session, check the server for a Google OAuth session
+  if (!session) {
+    try {
+      const status = await fetchJson('/api/auth/status');
+      // Verify they are authenticated and have the correct manager role
+      if (status.authenticated && status.role === 'manager') {
+        session = status;
+        saveRoleSession(session); // Save to sessionStorage so it persists on refresh
+      }
+    } catch (e) {
+      // Not logged in via Google, or server error - fallback to login form
+      console.log("No active Google session found.");
+    }
+  }
+
+  // 3. If we have a valid session (from either method), show the workspace
   if (session && session.role === 'manager') {
     showManagerWorkspace(session);
     await loadManagerWorkspace();
   }
 
+  // 4. Attach event listeners for the tab system
   document.querySelectorAll('[data-manager-tab]').forEach((button) => {
     button.addEventListener('click', () => setManagerTab(button.dataset.managerTab));
   });
   setManagerTab('reports');
 
+  // 5. Handle the manual (Username/Password) Login Form
   const form = document.getElementById('manager-login-form');
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -970,11 +990,14 @@ async function bootManager() {
     }
   });
 
+  // 6. Handle Sign Out
   document.getElementById('manager-sign-out').addEventListener('click', () => {
     clearRoleSession();
+    // Also redirect to a logout route if you want to clear the Google session server-side
     window.location.replace('/');
   });
 
+  // 7. Attach Report Handlers
   document.getElementById('report-total-revenue').addEventListener('click', () => runReportWithStatus(runReportTotalRevenue));
   document.getElementById('report-low-inventory').addEventListener('click', () => runReportWithStatus(runReportLowInventory));
   document.getElementById('report-most-ordered').addEventListener('click', () => runReportWithStatus(runReportMostOrdered));
@@ -984,6 +1007,7 @@ async function bootManager() {
     await runReportWithStatus(() => runReportInventoryUsage(event.currentTarget));
   });
 
+  // 8. Attach Z-Report Handler
   document.getElementById('report-z').addEventListener('click', async () => {
     const employeeSignature = window.prompt('Closing staff signature:');
     if (!employeeSignature) return;
@@ -1021,6 +1045,7 @@ async function bootManager() {
     }
   });
 
+  // 9. Attach Reset Z-Report Handler
   document.getElementById('report-reset-z').addEventListener('click', async () => {
     try {
       const result = await fetchJson('/api/reports/reset-z', { method: 'POST' });
@@ -1035,6 +1060,7 @@ async function bootManager() {
     }
   });
 
+  // 10. Attach Menu Actions
   document.getElementById('manager-show-inactive').addEventListener('change', () => runManagerAction(loadManagerMenuTable, 'manager-menu-status', 'Menu table refreshed.'));
   document.getElementById('menu-refresh').addEventListener('click', () => runManagerAction(loadManagerMenuTable, 'manager-menu-status', 'Menu table refreshed.'));
 
@@ -1108,6 +1134,7 @@ async function bootManager() {
     }, 'manager-menu-status', 'Menu item added.');
   });
 
+  // 11. Attach Inventory Actions
   document.getElementById('inventory-refresh').addEventListener('click', () => runManagerAction(loadManagerInventoryTable, 'manager-inventory-status', 'Inventory table refreshed.'));
 
   document.getElementById('inventory-update-quantity').addEventListener('click', async () => {
@@ -1175,6 +1202,7 @@ async function bootManager() {
     }, 'manager-inventory-status', 'Inventory item added.');
   });
 
+  // 12. Attach Employee Actions
   document.getElementById('employees-refresh').addEventListener('click', () => runManagerAction(loadManagerEmployeesTable, 'manager-employees-status', 'Employees table refreshed.'));
   document.getElementById('employees-update-role').addEventListener('click', async () => {
     const data = new FormData(document.getElementById('employee-role-form'));
@@ -1301,5 +1329,31 @@ async function boot() {
     });
   }
 }
+
+document.getElementById('login-form')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  
+  const payload = {
+    username: document.getElementById('username').value,
+    password: document.getElementById('password').value,
+    role: document.getElementById('role').value
+  };
+
+  const response = await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+
+  const result = await response.json();
+
+  if (response.ok && result.authenticated) {
+    document.getElementById('login-message').innerText = `Welcome, ${result.name}!`;
+    // Redirect based on role
+    window.location.href = `/${result.role}`;
+  } else {
+    document.getElementById('login-message').innerText = "Login failed. Please check your credentials.";
+  }
+});
 
 boot();
