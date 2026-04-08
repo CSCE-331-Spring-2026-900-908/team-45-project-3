@@ -7,17 +7,187 @@
     <link rel="stylesheet" href="/assets/styles.css" />
   </head>
   <body data-page="customer">
-    <div class="page-shell inner-page">
+    <a class="skip-link" href="#customer-cart-panel">Skip to cart</a>
+
+    <div class="page-shell inner-page customer-page" translate="yes">
       <nav class="top-nav">
         <a href="/">Portal</a>
       </nav>
 
-      <header class="page-header">
-        <p class="eyebrow">Customer Interface</p>
-        <h1>WIP</h1>
+      <header class="page-header customer-hero">
+        <div class="customer-hero-copy">
+          <p class="eyebrow">Customer Interface</p>
+          <h1>Build your drink and keep the cart in view.</h1>
+          <p>
+            Pick a category, browse the live menu from the database, customize your drink, and
+            track rewards on every order.
+          </p>
+        </div>
+
+        <div class="customer-accessibility-tools" aria-label="Accessibility controls">
+          <button id="customer-contrast-toggle" class="ghost-button" type="button" aria-pressed="false">
+            High Contrast
+          </button>
+          <p class="muted-line">
+            Translation-friendly text stays selectable for browser translation tools and extensions.
+          </p>
+        </div>
       </header>
 
+      <main class="customer-layout">
+        <section class="customer-main stack-layout" aria-labelledby="customer-menu-heading">
+          <section class="content-card">
+            <div class="section-heading">
+              <div>
+                <p class="section-label">Rewards Login</p>
+                <h2 id="customer-menu-heading">Welcome to the menu</h2>
+                <p class="muted-line">
+                  Sign in with your name and email to track the free-drink reward on every 5th order.
+                </p>
+              </div>
+            </div>
+
+            <div class="customer-account-grid">
+              <form id="customer-login-form" class="auth-form compact-auth-form" autocomplete="on">
+                <label>
+                  <span>Name</span>
+                  <input id="customer-name" name="name" type="text" autocomplete="name" required />
+                </label>
+                <label>
+                  <span>Email</span>
+                  <input id="customer-email" name="email" type="email" autocomplete="email" required />
+                </label>
+                <div class="button-row customer-login-actions">
+                  <button class="action-button" type="submit">Save Rewards Profile</button>
+                  <button id="customer-logout" class="ghost-button" type="button">Sign Out</button>
+                </div>
+              </form>
+
+              <section class="customer-rewards-card" aria-labelledby="customer-rewards-heading">
+                <p class="section-label">Rewards Status</p>
+                <h3 id="customer-rewards-heading">No rewards profile yet</h3>
+                <p id="customer-rewards-copy" class="muted-line">
+                  Save a rewards profile to count orders toward a free drink.
+                </p>
+                <div class="customer-rewards-progress" aria-hidden="true">
+                  <div id="customer-rewards-bar" class="customer-rewards-progress-bar"></div>
+                </div>
+                <p id="customer-rewards-meta" class="muted-line">0 of 5 orders completed</p>
+              </section>
+            </div>
+          </section>
+
+          <section class="content-card">
+            <div class="section-heading">
+              <div>
+                <p class="section-label">Categories</p>
+                <h2>Choose a drink family</h2>
+              </div>
+              <p id="customer-products-status" class="status-text" data-tone="neutral">
+                Loading live menu...
+              </p>
+            </div>
+
+            <div id="customer-category-buttons" class="customer-category-grid" role="tablist" aria-label="Menu categories"></div>
+          </section>
+
+          <section class="content-card">
+            <div class="section-heading">
+              <div>
+                <p class="section-label">Live Menu</p>
+                <h2 id="customer-active-category">Products</h2>
+                <p id="customer-category-description" class="muted-line"></p>
+              </div>
+              <p id="customer-product-count" class="toolbar-note"></p>
+            </div>
+
+            <div id="customer-product-grid" class="customer-product-grid" aria-live="polite"></div>
+          </section>
+        </section>
+
+        <aside id="customer-cart-panel" class="content-card customer-cart-panel" aria-labelledby="customer-cart-heading">
+          <p class="section-label">Shopping Cart</p>
+          <h2 id="customer-cart-heading">Your order</h2>
+          <p class="muted-line">This cart stays visible while you browse.</p>
+
+          <div id="customer-reward-banner" class="customer-reward-banner" hidden></div>
+          <div id="customer-cart-lines" class="cart-list"></div>
+
+          <div class="summary-grid">
+            <div><span>Subtotal</span><strong id="customer-subtotal">$0.00</strong></div>
+            <div><span>Tax</span><strong id="customer-tax">$0.00</strong></div>
+            <div><span>Rewards</span><strong id="customer-discount">$0.00</strong></div>
+            <div><span>Total</span><strong id="customer-total">$0.00</strong></div>
+          </div>
+
+          <div class="button-row">
+            <button id="customer-preview-order" class="ghost-button" type="button">Refresh Total</button>
+            <button id="customer-checkout" class="action-button" type="button">Place Order</button>
+          </div>
+
+          <p id="customer-cart-status" class="status-text" data-tone="neutral">
+            Choose an item to start building your order.
+          </p>
+        </aside>
+      </main>
     </div>
+
+    <dialog id="customer-customize-dialog" class="customer-dialog" aria-labelledby="customer-dialog-title">
+      <form id="customer-customize-form" method="dialog" class="customer-dialog-form">
+        <div class="section-heading">
+          <div>
+            <p class="section-label">Customize Drink</p>
+            <h2 id="customer-dialog-title">Drink</h2>
+            <p id="customer-dialog-price" class="muted-line"></p>
+          </div>
+          <button id="customer-close-dialog" class="ghost-button mini-button" type="button" aria-label="Close customization dialog">
+            Close
+          </button>
+        </div>
+
+        <div class="stack-layout compact-gap">
+          <label class="field-block">
+            <span>Quantity</span>
+            <input id="customer-qty" name="quantity" class="numeric-input" type="number" min="1" value="1" />
+          </label>
+
+          <fieldset class="field-block">
+            <legend>Size</legend>
+            <div class="customer-choice-grid">
+              <label><input type="radio" name="customer-size" value="Small" /> Small</label>
+              <label><input type="radio" name="customer-size" value="Medium" checked /> Medium</label>
+              <label><input type="radio" name="customer-size" value="Large" /> Large</label>
+            </div>
+          </fieldset>
+
+          <fieldset class="field-block">
+            <legend>Sweetness</legend>
+            <div class="customer-choice-grid">
+              <label><input type="radio" name="customer-sugar" value="0" /> 0%</label>
+              <label><input type="radio" name="customer-sugar" value="25" /> 25%</label>
+              <label><input type="radio" name="customer-sugar" value="50" checked /> 50%</label>
+              <label><input type="radio" name="customer-sugar" value="75" /> 75%</label>
+              <label><input type="radio" name="customer-sugar" value="100" /> 100%</label>
+            </div>
+          </fieldset>
+
+          <fieldset class="field-block">
+            <legend>Toppings</legend>
+            <div class="check-grid customer-topping-grid">
+              <label><input type="checkbox" name="customer-topping" value="Boba" /> Boba</label>
+              <label><input type="checkbox" name="customer-topping" value="Crystal Boba" /> Crystal Boba</label>
+              <label><input type="checkbox" name="customer-topping" value="Lychee Jelly" /> Lychee Jelly</label>
+              <label><input type="checkbox" name="customer-topping" value="Pudding" /> Pudding</label>
+            </div>
+          </fieldset>
+
+          <div class="button-row">
+            <button id="customer-add-to-cart" class="action-button" type="submit">Add To Cart</button>
+          </div>
+          <p class="muted-line">All options are keyboard accessible and remain readable for translation tools.</p>
+        </div>
+      </form>
+    </dialog>
 
     <script src="/assets/app.js"></script>
   </body>

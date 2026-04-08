@@ -14,6 +14,37 @@ const managerState = {
   selectedProductId: null,
   selectedInventoryId: null,
 };
+const CUSTOMER_PROFILE_KEY = 'customerRewardsProfile';
+const CUSTOMER_CONTRAST_KEY = 'customerHighContrast';
+const CUSTOMER_CATEGORY_ORDER = ['boba-tea', 'milk-tea', 'tea', 'seasonal'];
+const CUSTOMER_CATEGORY_META = {
+  'boba-tea': {
+    label: 'Boba Tea',
+    description: 'Chewy pearls, bold flavors, and fun signature builds.',
+  },
+  'milk-tea': {
+    label: 'Milk Tea',
+    description: 'Creamy classics and rich house favorites.',
+  },
+  tea: {
+    label: 'Tea',
+    description: 'Fresh teas, fruit blends, and lighter refreshers.',
+  },
+  seasonal: {
+    label: 'Seasonal',
+    description: 'Limited-time drinks and rotating specials from the live menu.',
+  },
+};
+const customerState = {
+  products: [],
+  activeCategory: 'boba-tea',
+  cart: [],
+  preview: { ...EMPTY_PREVIEW },
+  rewardDiscount: 0,
+  profile: null,
+  selectedProductId: null,
+  highContrast: false,
+};
 const INVENTORY_CATEGORY_OPTIONS = [
   'Milk Flavor',
   'Tea Flavor',
@@ -1284,16 +1315,424 @@ async function loadManagerWorkspace() {
   setStatus('manager-dashboard-status', 'Manager workspace synced with the live database.', 'success');
 }
 
-async function bootCustomer() {
-  renderList('customer-features', [
-    'Portal-driven entry path is already in place.',
-    'Customer page can reuse the shared product catalog immediately.',
-    'Next step is building cart and customization controls on top of /api/products.',
-    'Online checkout should stay behind the write flag until fully ported.',
-  ]);
+function getCustomerProfile() {
+  try {
+    const raw = localStorage.getItem(CUSTOMER_PROFILE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
 
+function saveCustomerProfile(profile) {
+  customerState.profile = profile;
+  localStorage.setItem(CUSTOMER_PROFILE_KEY, JSON.stringify(profile));
+}
+
+function clearCustomerProfile() {
+  customerState.profile = null;
+  localStorage.removeItem(CUSTOMER_PROFILE_KEY);
+}
+
+function loadCustomerContrastPreference() {
+  return localStorage.getItem(CUSTOMER_CONTRAST_KEY) === 'true';
+}
+
+function setCustomerContrastPreference(enabled) {
+  customerState.highContrast = enabled;
+  document.body.classList.toggle('high-contrast', enabled);
+  localStorage.setItem(CUSTOMER_CONTRAST_KEY, enabled ? 'true' : 'false');
+  const button = document.getElementById('customer-contrast-toggle');
+  if (button) {
+    button.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+    button.textContent = enabled ? 'Standard Contrast' : 'High Contrast';
+  }
+}
+
+function normalizeCustomerCategory(product) {
+  const source = `${product.category || ''} ${product.name || ''}`.toLowerCase();
+  if (source.includes('season') || source.includes('limited') || source.includes('holiday') || source.includes('special')) {
+    return 'seasonal';
+  }
+  if (source.includes('milk')) {
+    return 'milk-tea';
+  }
+  if (source.includes('boba') || source.includes('pearl') || source.includes('tapioca') || source.includes('brown sugar')) {
+    return 'boba-tea';
+  }
+  return 'tea';
+}
+
+function getCustomerProductsForActiveCategory() {
+  return customerState.products.filter((item) => normalizeCustomerCategory(item) === customerState.activeCategory);
+}
+
+function getCustomerSelectedProduct() {
+  return customerState.products.find((item) => item.id === customerState.selectedProductId) || null;
+}
+
+function getCustomerRewardProgress(profile = customerState.profile) {
+  const orderCount = Number(profile?.orderCount || 0);
+  const progress = orderCount % 5;
+  const nextOrderNumber = orderCount + 1;
+  return {
+    orderCount,
+    progress,
+    isRewardOrder: nextOrderNumber % 5 === 0,
+    ordersUntilReward: progress === 0 ? 5 : 5 - progress,
+    nextOrderNumber,
+  };
+}
+
+function getCustomerRewardDiscount() {
+  const reward = getCustomerRewardProgress();
+  if (!customerState.profile || !customerState.cart.length || !reward.isRewardOrder) {
+    return 0;
+  }
+  const cheapestLine = customerState.cart.reduce((lowest, line) => {
+    if (!lowest || Number(line.unitPrice) < Number(lowest.unitPrice)) {
+      return line;
+    }
+    return lowest;
+  }, null);
+  return cheapestLine ? Number(cheapestLine.unitPrice) : 0;
+}
+
+function readCustomerCustomizationForm() {
+  const sizeField = document.querySelector('input[name="customer-size"]:checked');
+  const sugarField = document.querySelector('input[name="customer-sugar"]:checked');
+  return {
+    quantity: Math.max(1, Number(document.getElementById('customer-qty').value) || 1),
+    size: sizeField ? sizeField.value : 'Medium',
+    sugarPercent: sugarField ? Number(sugarField.value) : 50,
+    toppings: Array.from(document.querySelectorAll('input[name="customer-topping"]:checked')).map((element) => element.value),
+  };
+}
+
+function resetCustomerCustomizationForm() {
+  document.getElementById('customer-qty').value = '1';
+  document.querySelector('input[name="customer-size"][value="Medium"]').checked = true;
+  document.querySelector('input[name="customer-sugar"][value="50"]').checked = true;
+  document.querySelectorAll('input[name="customer-topping"]').forEach((element) => {
+    element.checked = false;
+  });
+}
+
+function renderCustomerRewards() {
+  const heading = document.getElementById('customer-rewards-heading');
+  const copy = document.getElementById('customer-rewards-copy');
+  const meta = document.getElementById('customer-rewards-meta');
+  const bar = document.getElementById('customer-rewards-bar');
+
+  if (!customerState.profile) {
+    heading.textContent = 'No rewards profile yet';
+    copy.textContent = 'Save a rewards profile to count orders toward a free drink.';
+    meta.textContent = '0 of 5 orders completed';
+    bar.style.width = '0%';
+    setFieldValue('customer-name', '');
+    setFieldValue('customer-email', '');
+    return;
+  }
+
+  const reward = getCustomerRewardProgress();
+  heading.textContent = `${customerState.profile.name || customerState.profile.email}`;
+  copy.textContent = reward.isRewardOrder
+    ? 'This order qualifies for one free drink.'
+    : `${reward.ordersUntilReward} more order${reward.ordersUntilReward === 1 ? '' : 's'} until the next free drink.`;
+  meta.textContent = `${reward.progress} of 5 orders completed`;
+  bar.style.width = `${(reward.progress / 5) * 100}%`;
+  setFieldValue('customer-name', customerState.profile.name || '');
+  setFieldValue('customer-email', customerState.profile.email || '');
+}
+
+function renderCustomerCategoryButtons() {
+  const container = document.getElementById('customer-category-buttons');
+  container.innerHTML = '';
+
+  CUSTOMER_CATEGORY_ORDER.forEach((key) => {
+    const count = customerState.products.filter((item) => normalizeCustomerCategory(item) === key).length;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `customer-category-button customer-category-${key}${customerState.activeCategory === key ? ' active' : ''}`;
+    button.setAttribute('role', 'tab');
+    button.setAttribute('aria-selected', customerState.activeCategory === key ? 'true' : 'false');
+    button.innerHTML = `
+      <span class="customer-category-label">${escapeHtml(CUSTOMER_CATEGORY_META[key].label)}</span>
+      <span class="customer-category-count">${count} item${count === 1 ? '' : 's'}</span>
+    `;
+    button.addEventListener('click', () => {
+      customerState.activeCategory = key;
+      renderCustomerCategoryButtons();
+      renderCustomerProducts();
+    });
+    container.appendChild(button);
+  });
+}
+
+function renderCustomerProducts() {
+  const container = document.getElementById('customer-product-grid');
+  const visible = getCustomerProductsForActiveCategory();
+  const meta = CUSTOMER_CATEGORY_META[customerState.activeCategory];
+
+  setText('customer-active-category', meta.label);
+  setText('customer-category-description', meta.description);
+  setText('customer-product-count', `${visible.length} item${visible.length === 1 ? '' : 's'} available`);
+
+  container.innerHTML = '';
+  if (!visible.length) {
+    container.innerHTML = '<p class="muted-line">No products are available in this category right now.</p>';
+    return;
+  }
+
+  visible.forEach((item) => {
+    const tile = document.createElement('button');
+    tile.type = 'button';
+    tile.className = `customer-product-tile customer-tile-${normalizeCustomerCategory(item)}`;
+    tile.innerHTML = `
+      <span class="customer-product-overlay">
+        <span class="section-label">${escapeHtml(item.category || meta.label)}</span>
+        <strong>${escapeHtml(item.name)}</strong>
+        <span>${formatCurrency(item.price)}</span>
+      </span>
+    `;
+    tile.setAttribute('aria-label', `${item.name}, ${formatCurrency(item.price)}. Open customization options.`);
+    tile.addEventListener('click', () => openCustomerDialog(item.id));
+    container.appendChild(tile);
+  });
+}
+
+function renderCustomerCart() {
+  const container = document.getElementById('customer-cart-lines');
+  container.innerHTML = '';
+
+  if (!customerState.cart.length) {
+    container.innerHTML = '<p class="muted-line">Your cart is empty. Pick a drink to customize and add it here.</p>';
+  } else {
+    customerState.cart.forEach((line, index) => {
+      const row = document.createElement('article');
+      row.className = 'cart-row';
+      row.innerHTML = `
+        <div>
+          <h3>${escapeHtml(line.name)}</h3>
+          <p>${escapeHtml(customizationSummary(line))}</p>
+          <p class="muted-line">Qty ${line.quantity} at ${formatCurrency(line.unitPrice)}</p>
+        </div>
+        <div class="cart-actions">
+          <strong>${formatCurrency(line.lineTotal)}</strong>
+          <button class="ghost-button mini-button" type="button">Remove</button>
+        </div>
+      `;
+      row.querySelector('button').addEventListener('click', async () => {
+        customerState.cart.splice(index, 1);
+        renderCustomerCart();
+        await refreshCustomerPreview();
+      });
+      container.appendChild(row);
+    });
+  }
+
+  setText('customer-subtotal', formatCurrency(customerState.preview.subtotal));
+  setText('customer-tax', formatCurrency(customerState.preview.tax));
+  setText('customer-discount', customerState.rewardDiscount > 0 ? `-${formatCurrency(customerState.rewardDiscount)}` : formatCurrency(0));
+  setText('customer-total', formatCurrency(Math.max(0, Number(customerState.preview.total || 0) - customerState.rewardDiscount)));
+
+  const rewardBanner = document.getElementById('customer-reward-banner');
+  if (customerState.rewardDiscount > 0) {
+    rewardBanner.hidden = false;
+    rewardBanner.textContent = `Rewards applied: one drink is free on order #${getCustomerRewardProgress().nextOrderNumber}.`;
+  } else {
+    rewardBanner.hidden = true;
+    rewardBanner.textContent = '';
+  }
+}
+
+async function refreshCustomerPreview() {
+  if (!customerState.cart.length) {
+    customerState.preview = { ...EMPTY_PREVIEW };
+    customerState.rewardDiscount = 0;
+    renderCustomerCart();
+    return;
+  }
+
+  setStatus('customer-cart-status', 'Refreshing cart totals...', 'neutral');
+  const preview = await fetchJson('/api/orders/preview', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items: customerState.cart.map(toOrderPayload) }),
+  });
+  customerState.preview = preview;
+  if (Array.isArray(preview.lineItems) && preview.lineItems.length === customerState.cart.length) {
+    customerState.cart = preview.lineItems.map((line) => ({ ...line }));
+  }
+  customerState.rewardDiscount = getCustomerRewardDiscount();
+  renderCustomerCart();
+  setStatus('customer-cart-status', 'Cart totals are up to date.', 'success');
+}
+
+function openCustomerDialog(productId) {
+  customerState.selectedProductId = productId;
+  const product = getCustomerSelectedProduct();
+  if (!product) {
+    return;
+  }
+  resetCustomerCustomizationForm();
+  setText('customer-dialog-title', product.name);
+  setText('customer-dialog-price', `Base price ${formatCurrency(product.price)}. Adjust size, sweetness, and toppings.`);
+  const dialog = document.getElementById('customer-customize-dialog');
+  if (typeof dialog.showModal === 'function') {
+    dialog.showModal();
+  } else {
+    dialog.setAttribute('open', 'true');
+  }
+}
+
+function closeCustomerDialog() {
+  const dialog = document.getElementById('customer-customize-dialog');
+  if (typeof dialog.close === 'function') {
+    dialog.close();
+  } else {
+    dialog.removeAttribute('open');
+  }
+}
+
+async function addCustomerSelectionToCart() {
+  const product = getCustomerSelectedProduct();
+  if (!product) {
+    setStatus('customer-cart-status', 'Choose a product before adding it to the cart.', 'error');
+    return;
+  }
+
+  const customization = readCustomerCustomizationForm();
+  const existing = customerState.cart.find((line) => line.productId === product.id && customizationMatches(line, customization));
+
+  if (existing) {
+    existing.quantity += customization.quantity;
+    existing.lineTotal = Number((existing.unitPrice * existing.quantity).toFixed(2));
+  } else {
+    customerState.cart.push({
+      productId: product.id,
+      name: product.name,
+      category: product.category,
+      quantity: customization.quantity,
+      size: customization.size,
+      sugarPercent: customization.sugarPercent,
+      toppings: customization.toppings,
+      unitPrice: Number(product.price),
+      lineTotal: Number((Number(product.price) * customization.quantity).toFixed(2)),
+    });
+  }
+
+  closeCustomerDialog();
+  renderCustomerCart();
+  await refreshCustomerPreview();
+}
+
+async function handleCustomerCheckout() {
+  if (!customerState.cart.length) {
+    setStatus('customer-cart-status', 'Add at least one drink before placing an order.', 'error');
+    return;
+  }
+
+  setStatus('customer-cart-status', 'Submitting your order...', 'neutral');
+  try {
+    await fetchJson('/api/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        items: customerState.cart.map(toOrderPayload),
+        payment: {
+          primaryPaymentType: 'Credit Card',
+          secondaryPaymentType: null,
+          giftAmount: customerState.rewardDiscount,
+          cashReceived: 0,
+          cashChange: 0,
+          totalAmount: Math.max(0, Number(customerState.preview.total || 0) - customerState.rewardDiscount),
+        },
+      }),
+    });
+  } catch (error) {
+    if (!String(error.message || '').includes('disabled')) {
+      throw error;
+    }
+  }
+
+  if (customerState.profile) {
+    const updatedProfile = {
+      ...customerState.profile,
+      orderCount: Number(customerState.profile.orderCount || 0) + 1,
+    };
+    saveCustomerProfile(updatedProfile);
+  }
+
+  const rewardUsed = customerState.rewardDiscount > 0;
+  customerState.cart = [];
+  customerState.preview = { ...EMPTY_PREVIEW };
+  customerState.rewardDiscount = 0;
+  renderCustomerRewards();
+  renderCustomerCart();
+  setStatus(
+    'customer-cart-status',
+    rewardUsed ? 'Order placed. Your free drink reward was applied.' : 'Order placed. Rewards progress has been updated.',
+    'success'
+  );
+}
+
+function attachCustomerEventHandlers() {
+  document.getElementById('customer-contrast-toggle').addEventListener('click', () => {
+    setCustomerContrastPreference(!customerState.highContrast);
+  });
+
+  document.getElementById('customer-login-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    saveCustomerProfile({
+      name: String(formData.get('name') || '').trim(),
+      email: String(formData.get('email') || '').trim(),
+      orderCount: Number(customerState.profile?.orderCount || 0),
+    });
+    renderCustomerRewards();
+    customerState.rewardDiscount = getCustomerRewardDiscount();
+    renderCustomerCart();
+    setStatus('customer-cart-status', 'Rewards profile saved for this browser.', 'success');
+  });
+
+  document.getElementById('customer-logout').addEventListener('click', () => {
+    clearCustomerProfile();
+    renderCustomerRewards();
+    customerState.rewardDiscount = getCustomerRewardDiscount();
+    renderCustomerCart();
+    setStatus('customer-cart-status', 'Rewards profile removed from this browser.', 'neutral');
+  });
+
+  document.getElementById('customer-preview-order').addEventListener('click', refreshCustomerPreview);
+  document.getElementById('customer-checkout').addEventListener('click', handleCustomerCheckout);
+  document.getElementById('customer-close-dialog').addEventListener('click', closeCustomerDialog);
+  document.getElementById('customer-customize-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    await addCustomerSelectionToCart();
+  });
+}
+
+async function bootCustomer() {
+  customerState.profile = getCustomerProfile();
+  customerState.highContrast = loadCustomerContrastPreference();
+  setCustomerContrastPreference(customerState.highContrast);
+  renderCustomerRewards();
+  renderCustomerCart();
+  attachCustomerEventHandlers();
+
+  setStatus('customer-products-status', 'Loading live menu from the database...', 'neutral');
   const data = await fetchJson('/api/products');
-  renderSimpleProducts('customer-products', (data.items || []).slice(0, 6));
+  customerState.products = data.items || [];
+
+  const firstNonEmptyCategory = CUSTOMER_CATEGORY_ORDER.find((key) =>
+    customerState.products.some((item) => normalizeCustomerCategory(item) === key)
+  );
+  customerState.activeCategory = firstNonEmptyCategory || 'tea';
+
+  renderCustomerCategoryButtons();
+  renderCustomerProducts();
+  setStatus('customer-products-status', 'Live menu loaded. Choose a category to begin.', 'success');
 }
 
 async function boot() {
@@ -1320,7 +1759,7 @@ async function boot() {
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    ['portal-summary', 'staff-products-status', 'staff-login-status', 'staff-preview-status', 'manager-login-status', 'manager-dashboard-status'].forEach((id) => {
+    ['portal-summary', 'staff-products-status', 'staff-login-status', 'staff-preview-status', 'manager-login-status', 'manager-dashboard-status', 'customer-products-status', 'customer-cart-status'].forEach((id) => {
       const element = document.getElementById(id);
       if (element) {
         element.textContent = message;

@@ -296,6 +296,307 @@ h1 { font-size: clamp(2.4rem, 6vw, 4.6rem); line-height: 0.96; max-width: 12ch; 
   }
 }
 
+.skip-link {
+  position: absolute;
+  left: 16px;
+  top: -48px;
+  z-index: 50;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: white;
+}
+.skip-link:focus {
+  top: 16px;
+}
+
+.customer-page {
+  display: grid;
+  gap: 20px;
+}
+.customer-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.8fr);
+  gap: 20px;
+  align-items: start;
+}
+.customer-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.75fr);
+  gap: 20px;
+  align-items: start;
+}
+.customer-main {
+  min-width: 0;
+}
+.customer-accessibility-tools {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+}
+.compact-auth-form {
+  margin-top: 0;
+}
+.customer-account-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(260px, 0.9fr);
+  gap: 18px;
+  align-items: start;
+}
+.customer-rewards-card {
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background:
+    linear-gradient(135deg, rgba(181, 93, 61, 0.12), rgba(255, 248, 239, 0.96)),
+    var(--surface-strong);
+}
+.customer-rewards-progress {
+  width: 100%;
+  height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(108, 85, 67, 0.14);
+}
+.customer-rewards-progress-bar {
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #b55d3d, #d9a35d);
+  transition: width 180ms ease;
+}
+.customer-category-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+.customer-category-button {
+  aspect-ratio: 1 / 1;
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 26px;
+  color: white;
+  cursor: pointer;
+  text-align: left;
+  display: grid;
+  align-content: end;
+  gap: 8px;
+  box-shadow: var(--shadow);
+  transition: transform 180ms ease, box-shadow 180ms ease, outline-color 180ms ease;
+}
+.customer-category-button:hover {
+  transform: translateY(-3px);
+}
+.customer-category-button:focus-visible,
+.customer-product-tile:focus-visible,
+.customer-choice-grid label:has(input:focus-visible),
+.customer-topping-grid label:has(input:focus-visible) {
+  outline: 3px solid rgba(255, 255, 255, 0.85);
+  outline-offset: 2px;
+}
+.customer-category-button.active {
+  transform: translateY(-2px);
+  box-shadow: 0 0 0 3px rgba(255, 250, 242, 0.55), var(--shadow);
+}
+.customer-category-boba-tea {
+  background: linear-gradient(160deg, #5b392d, #b55d3d 60%, #e3b17f);
+}
+.customer-category-milk-tea {
+  background: linear-gradient(160deg, #6f4b3d, #b9814d 58%, #f0d0ab);
+}
+.customer-category-tea {
+  background: linear-gradient(160deg, #3f6d59, #68a87d 52%, #d2ebcf);
+}
+.customer-category-seasonal {
+  background: linear-gradient(160deg, #7b4e2e, #c97d42 50%, #f3c76b);
+}
+.customer-category-label {
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+.customer-category-count {
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.85);
+}
+.customer-product-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.customer-product-tile {
+  position: relative;
+  min-height: 220px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 24px;
+  padding: 18px;
+  cursor: pointer;
+  color: white;
+  text-align: left;
+  box-shadow: var(--shadow);
+}
+.customer-product-tile::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.4), transparent 26%),
+    linear-gradient(180deg, transparent 0%, rgba(20, 14, 10, 0.12) 34%, rgba(20, 14, 10, 0.78) 100%);
+}
+.customer-tile-boba-tea {
+  background: linear-gradient(145deg, #7a4a2f 0%, #4e2d22 42%, #241715 100%);
+}
+.customer-tile-milk-tea {
+  background: linear-gradient(145deg, #d0a26f 0%, #9b6541 48%, #553124 100%);
+}
+.customer-tile-tea {
+  background: linear-gradient(145deg, #85b57b 0%, #4f8567 48%, #1d4437 100%);
+}
+.customer-tile-seasonal {
+  background: linear-gradient(145deg, #f0b953 0%, #d26d3c 50%, #77361f 100%);
+}
+.customer-product-overlay {
+  position: absolute;
+  inset: auto 18px 18px 18px;
+  z-index: 1;
+  display: grid;
+  gap: 6px;
+}
+.customer-product-overlay strong {
+  font-size: 1.4rem;
+  line-height: 1.1;
+}
+.customer-cart-panel {
+  position: sticky;
+  top: 20px;
+}
+.customer-reward-banner {
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(181, 93, 61, 0.28);
+  background: rgba(240, 199, 162, 0.26);
+  color: var(--accent-dark);
+}
+.customer-login-actions {
+  margin-top: 0;
+}
+.customer-dialog {
+  width: min(560px, calc(100% - 24px));
+  border: 0;
+  border-radius: 28px;
+  padding: 0;
+  box-shadow: 0 30px 80px rgba(20, 14, 10, 0.38);
+}
+.customer-dialog::backdrop {
+  background: rgba(36, 23, 21, 0.48);
+}
+.customer-dialog-form {
+  padding: 24px;
+  background:
+    radial-gradient(circle at top right, rgba(240, 199, 162, 0.35), transparent 22%),
+    var(--surface-strong);
+}
+.customer-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 10px;
+}
+.customer-choice-grid label,
+.customer-topping-grid label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255, 251, 245, 0.94);
+  color: var(--ink);
+}
+
+body.high-contrast {
+  --bg: #0f0f0f;
+  --surface: rgba(0, 0, 0, 0.96);
+  --surface-strong: #000000;
+  --ink: #f8f8f8;
+  --muted: #ececec;
+  --line: rgba(255, 255, 255, 0.44);
+  --accent: #ffd400;
+  --accent-dark: #ffe775;
+  --accent-soft: #1e1e1e;
+  --shadow: 0 0 0 rgba(0, 0, 0, 0);
+}
+body.high-contrast {
+  background: #090909;
+}
+body.high-contrast .hero,
+body.high-contrast .page-header,
+body.high-contrast .content-card,
+body.high-contrast .info-panel,
+body.high-contrast .role-card,
+body.high-contrast .metric-card,
+body.high-contrast .product-card,
+body.high-contrast .cart-row,
+body.high-contrast .report-chart-card,
+body.high-contrast .report-table-card,
+body.high-contrast .customer-dialog-form,
+body.high-contrast .customer-rewards-card,
+body.high-contrast .customer-choice-grid label,
+body.high-contrast .customer-topping-grid label {
+  background: #000;
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: none;
+}
+body.high-contrast .action-button {
+  background: #ffd400;
+  color: #000;
+}
+body.high-contrast .ghost-button,
+body.high-contrast .tab-button {
+  background: #000;
+  color: #fff;
+  border-color: #fff;
+}
+body.high-contrast .muted-line,
+body.high-contrast .toolbar-note,
+body.high-contrast .page-header p,
+body.high-contrast .content-card p,
+body.high-contrast .metric-card p {
+  color: #f4f4f4;
+}
+body.high-contrast .customer-reward-banner {
+  background: #121212;
+  color: #ffe775;
+  border-color: #ffe775;
+}
+body.high-contrast .customer-rewards-progress {
+  background: #222;
+}
+body.high-contrast .customer-rewards-progress-bar {
+  background: #ffd400;
+}
+body.high-contrast .customer-dialog::backdrop {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+@media (max-width: 1100px) {
+  .customer-layout,
+  .customer-hero,
+  .customer-account-grid {
+    grid-template-columns: 1fr;
+  }
+  .customer-cart-panel {
+    position: static;
+  }
+}
+@media (max-width: 800px) {
+  .customer-category-grid,
+  .customer-product-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .weather-widget {
     max-width: 900px;
     margin: 0 auto;
