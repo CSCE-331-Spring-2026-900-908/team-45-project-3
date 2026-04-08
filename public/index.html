@@ -31,9 +31,79 @@
         </section>
         <br>
         <br>
+        <div class="weather-widget">
+          <h2>Local Weather Forecast</h2>
+          <div id="forecast-container">
+            <div class="loading">Loading latest data from the National Weather Service...</div>
+          </div>
+        </div>
       </main>
     </div>
 
     <script src="/assets/app.js"></script>
+    <script>
+      const lat = 30.6280;
+      const lon = -96.3344;
+
+      async function fetchNWSForecast() {
+        const container = document.getElementById('forecast-container');
+        
+        try {
+          // Step 1: Request the metadata for the coordinates
+          const pointsResponse = await fetch(`https://api.weather.gov/points/${lat},${lon}`);
+          
+          if (!pointsResponse.ok) {
+            throw new Error('Could not find location data. Please check the coordinates.');
+          }
+          
+          const pointsData = await pointsResponse.json();
+          
+          // Step 2: Extract the forecast URL and fetch the actual forecast
+          const forecastUrl = pointsData.properties.forecast;
+          const forecastResponse = await fetch(forecastUrl);
+          
+          if (!forecastResponse.ok) {
+            throw new Error('Could not retrieve forecast data.');
+          }
+          
+          const forecastData = await forecastResponse.json();
+          const periods = forecastData.properties.periods;
+          
+          // Clear the loading text
+          container.innerHTML = '';
+          
+          // Step 3: Loop through the next 7 periods (~3.5 days) and create HTML for each
+          // The NWS API usually returns 14 periods (7 days, day/night)
+          const periodsToDisplay = periods.slice(0, 7); 
+          
+          periodsToDisplay.forEach(period => {
+            const card = document.createElement('div');
+            card.className = 'forecast-card';
+            
+            // Determine a simple color class based on temperature
+            let tempClass = 'cool';
+            if (period.temperature >= 85) tempClass = 'hot';
+            else if (period.temperature >= 70) tempClass = 'warm';
+            else if (period.temperature <= 45) tempClass = 'cold';
+
+            card.innerHTML = `
+              <h3>${period.name}</h3>
+              <img src="${period.icon}" alt="${period.shortForecast}">
+              <p class="temp ${tempClass}">${period.temperature}&deg;${period.temperatureUnit}</p>
+              <p class="desc">${period.shortForecast}</p>
+            `;
+            
+            container.appendChild(card);
+          });
+
+        } catch (error) {
+          container.innerHTML = `<div class="error">⚠️ ${error.message}</div>`;
+          console.error('NWS API Error:', error);
+        }
+      }
+
+      // Initialize the fetch when the script loads
+      fetchNWSForecast();
+    </script>
   </body>
 </html>
