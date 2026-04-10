@@ -48,15 +48,20 @@
             <div class="customer-account-grid">
               <form id="customer-login-form" class="auth-form compact-auth-form" autocomplete="on">
                 <label>
-                  <span>Name</span>
-                  <input id="customer-name" name="name" type="text" autocomplete="name" required />
+                  <span>Name for rewards account</span>
+                  <input id="customer-name" name="name" type="text" autocomplete="name" />
                 </label>
                 <label>
                   <span>Email</span>
                   <input id="customer-email" name="email" type="email" autocomplete="email" required />
                 </label>
+                <label>
+                  <span>Password</span>
+                  <input id="customer-password" name="password" type="password" autocomplete="current-password" minlength="8" required />
+                </label>
                 <div class="button-row customer-login-actions">
-                  <button class="action-button" type="submit">Save Rewards Profile</button>
+                  <button id="customer-login" class="action-button" type="submit">Sign In</button>
+                  <button id="customer-register" class="ghost-button" type="button">Create Account</button>
                   <button id="customer-logout" class="ghost-button" type="button">Sign Out</button>
                 </div>
               </form>
@@ -65,7 +70,7 @@
                 <p class="section-label">Rewards Status</p>
                 <h3 id="customer-rewards-heading">No rewards profile yet</h3>
                 <p id="customer-rewards-copy" class="muted-line">
-                  Save a rewards profile to count orders toward a free drink.
+                  Sign in or create an account to count orders toward a free drink.
                 </p>
                 <div class="customer-rewards-progress" aria-hidden="true">
                   <div id="customer-rewards-bar" class="customer-rewards-progress-bar"></div>
@@ -159,7 +164,7 @@
                 type="button"
                 aria-label="Decrease quantity"
               >
-                Minus
+                -
               </button>
               <input id="customer-qty" name="quantity" class="numeric-input" type="number" min="1" value="1" />
               <button
@@ -168,7 +173,7 @@
                 type="button"
                 aria-label="Increase quantity"
               >
-                Plus
+                +
               </button>
             </div>
           </label>

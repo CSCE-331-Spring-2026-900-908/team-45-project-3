@@ -3,5 +3,6 @@ module.exports = {
   ...require('./catalog'),
   ...require('./employees'),
   ...require('./orders'),
+  ...require('./rewards'),
   ...require('./reports'),
 };

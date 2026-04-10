@@ -155,6 +155,42 @@ function createApp() {
     }
   });
 
+  app.get('/api/customer/rewards/session', asyncHandler(async (req, res) => {
+    const rewardsEmail = req.session.customerRewardsEmail;
+    if (!rewardsEmail) {
+      res.json({ authenticated: false });
+      return;
+    }
+
+    const profile = await db.fetchRewardsAccountByEmail(rewardsEmail);
+    if (!profile) {
+      delete req.session.customerRewardsEmail;
+      res.json({ authenticated: false });
+      return;
+    }
+
+    res.json({ authenticated: true, profile });
+  }));
+
+  app.post('/api/customer/rewards/register', asyncHandler(async (req, res) => {
+    ensureWritesEnabled();
+    const profile = await db.registerRewardsAccount(req.body || {});
+    req.session.customerRewardsEmail = profile.email;
+    res.status(201).json({ authenticated: true, profile });
+  }));
+
+  app.post('/api/customer/rewards/login', asyncHandler(async (req, res) => {
+    const { email, password } = req.body || {};
+    const profile = await db.authenticateRewardsAccount(email, password);
+    req.session.customerRewardsEmail = profile.email;
+    res.json({ authenticated: true, profile });
+  }));
+
+  app.post('/api/customer/rewards/logout', (req, res) => {
+    delete req.session.customerRewardsEmail;
+    res.json({ ok: true });
+  });
+
   // --- Utility / meta routes ---
   app.get('/api/health', (_, res) => {
     res.json({ ok: true, service: 'project3-portal' });
@@ -235,6 +271,21 @@ function createApp() {
       source: 'database',
       accepted: true,
       result: await db.submitOrderWithPayment(req.body?.items, req.body?.payment || {}),
+    });
+  }));
+
+  app.post('/api/customer/rewards/increment', asyncHandler(async (req, res) => {
+    ensureWritesEnabled();
+    const rewardsEmail = req.session.customerRewardsEmail;
+    if (!rewardsEmail) {
+      const error = new Error('Sign in to a rewards account before updating rewards.');
+      error.statusCode = 401;
+      throw error;
+    }
+
+    res.json({
+      ok: true,
+      profile: await db.incrementRewardsCounter(rewardsEmail),
     });
   }));
 

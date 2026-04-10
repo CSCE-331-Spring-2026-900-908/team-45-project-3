@@ -60,9 +60,24 @@ async function ensureReportingTables(client = null) {
   await runner.query("ALTER TABLE z_reports ADD COLUMN IF NOT EXISTS employee_sig TEXT NOT NULL DEFAULT ''");
 }
 
+async function ensureRewardsAccountsTable(client = null) {
+  const runner = client || getPool();
+  await runner.query(
+    'CREATE TABLE IF NOT EXISTS customer_rewards_accounts (' +
+      'email TEXT PRIMARY KEY, ' +
+      'password_hash TEXT NOT NULL, ' +
+      'reward_counter INT NOT NULL DEFAULT 0, ' +
+      "name TEXT NOT NULL DEFAULT '', " +
+      'created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP' +
+    ')'
+  );
+  await runner.query("ALTER TABLE customer_rewards_accounts ADD COLUMN IF NOT EXISTS name TEXT NOT NULL DEFAULT ''");
+}
+
 module.exports = {
   ensureOrderPaymentsTable,
   ensureOrderVoidsTable,
   ensureProductActiveColumn,
+  ensureRewardsAccountsTable,
   ensureReportingTables,
 };

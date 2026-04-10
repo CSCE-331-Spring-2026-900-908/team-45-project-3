@@ -14,9 +14,8 @@ const managerState = {
   selectedProductId: null,
   selectedInventoryId: null,
 };
-const CUSTOMER_PROFILE_KEY = 'customerRewardsProfile';
-const CUSTOMER_PROFILE_STORE_KEY = 'customerRewardsProfiles';
 const CUSTOMER_CONTRAST_KEY = 'customerHighContrast';
+const CUSTOMER_EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const CUSTOMER_CATEGORY_ORDER = ['boba-tea', 'milk-tea', 'tea', 'seasonal'];
 const CUSTOMER_CATEGORY_META = {
   'boba-tea': {
@@ -1321,106 +1320,47 @@ function normalizeCustomerEmail(email) {
   return String(email || '').trim().toLowerCase();
 }
 
-function getCustomerProfileStore() {
-  try {
-    const raw = localStorage.getItem(CUSTOMER_PROFILE_STORE_KEY);
-    const parsed = raw ? JSON.parse(raw) : {};
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-function saveCustomerProfileStore(store) {
-  localStorage.setItem(CUSTOMER_PROFILE_STORE_KEY, JSON.stringify(store));
-}
-
-function migrateLegacyCustomerProfile() {
-  try {
-    const raw = localStorage.getItem(CUSTOMER_PROFILE_KEY);
-    if (!raw) {
-      return null;
-    }
-
-    const legacyProfile = JSON.parse(raw);
-    const normalizedEmail = normalizeCustomerEmail(legacyProfile?.email);
-    if (!normalizedEmail) {
-      return legacyProfile || null;
-    }
-
-    const store = getCustomerProfileStore();
-    if (!store[normalizedEmail]) {
-      store[normalizedEmail] = {
-        ...legacyProfile,
-        email: normalizedEmail,
-      };
-      saveCustomerProfileStore(store);
-    }
-    localStorage.removeItem(CUSTOMER_PROFILE_KEY);
-    return store[normalizedEmail];
-  } catch {
-    return null;
-  }
-}
-
-function getCustomerProfile() {
-  const legacyProfile = migrateLegacyCustomerProfile();
-  if (legacyProfile) {
-    return legacyProfile;
-  }
-
-  try {
-    const raw = localStorage.getItem(CUSTOMER_PROFILE_KEY);
-    if (!raw) {
-      return null;
-    }
-
-    const sessionProfile = JSON.parse(raw);
-    const normalizedEmail = normalizeCustomerEmail(sessionProfile?.email);
-    if (!normalizedEmail) {
-      return sessionProfile || null;
-    }
-
-    const store = getCustomerProfileStore();
-    return store[normalizedEmail] || {
-      ...sessionProfile,
-      email: normalizedEmail,
-    };
-  } catch {
-    return null;
-  }
-}
-
-function findCustomerProfileByEmail(email) {
-  const normalizedEmail = normalizeCustomerEmail(email);
-  if (!normalizedEmail) {
-    return null;
-  }
-
-  const store = getCustomerProfileStore();
-  return store[normalizedEmail] || null;
-}
-
 function saveCustomerProfile(profile) {
-  const normalizedEmail = normalizeCustomerEmail(profile?.email);
-  const nextProfile = {
-    ...profile,
-    email: normalizedEmail || String(profile?.email || '').trim(),
-  };
-
-  customerState.profile = nextProfile;
-  localStorage.setItem(CUSTOMER_PROFILE_KEY, JSON.stringify(nextProfile));
-
-  if (normalizedEmail) {
-    const store = getCustomerProfileStore();
-    store[normalizedEmail] = nextProfile;
-    saveCustomerProfileStore(store);
-  }
+  customerState.profile = profile
+    ? {
+      ...profile,
+      email: normalizeCustomerEmail(profile.email),
+      orderCount: Number(profile.orderCount || 0),
+    }
+    : null;
 }
 
 function clearCustomerProfile() {
   customerState.profile = null;
-  localStorage.removeItem(CUSTOMER_PROFILE_KEY);
+}
+
+function readCustomerRewardsCredentials() {
+  const formData = new FormData(document.getElementById('customer-login-form'));
+  return {
+    name: String(formData.get('name') || '').trim(),
+    email: normalizeCustomerEmail(formData.get('email')),
+    password: String(formData.get('password') || ''),
+  };
+}
+
+function validateCustomerRewardsCredentials(credentials, requireName = false) {
+  if (!CUSTOMER_EMAIL_PATTERN.test(credentials.email)) {
+    throw new Error('Enter a valid email address.');
+  }
+  if (!credentials.password) {
+    throw new Error('Enter your password.');
+  }
+  if (credentials.password.length < 8) {
+    throw new Error('Password must be at least 8 characters.');
+  }
+  if (requireName && !credentials.name) {
+    throw new Error('Enter a name for the rewards account.');
+  }
+}
+
+async function loadCustomerRewardsSession() {
+  const data = await fetchJson('/api/customer/rewards/session');
+  saveCustomerProfile(data.authenticated ? data.profile : null);
 }
 
 function loadCustomerContrastPreference() {
@@ -1560,11 +1500,12 @@ function renderCustomerRewards() {
 
   if (!customerState.profile) {
     heading.textContent = 'No rewards profile yet';
-    copy.textContent = 'Save a rewards profile to count orders toward a free drink.';
+    copy.textContent = 'Sign in or create an account to count orders toward a free drink.';
     meta.textContent = '0 of 5 orders completed';
     bar.style.width = '0%';
     setFieldValue('customer-name', '');
     setFieldValue('customer-email', '');
+    setFieldValue('customer-password', '');
     return;
   }
 
@@ -1577,6 +1518,7 @@ function renderCustomerRewards() {
   bar.style.width = `${(reward.progress / 5) * 100}%`;
   setFieldValue('customer-name', customerState.profile.name || '');
   setFieldValue('customer-email', customerState.profile.email || '');
+  setFieldValue('customer-password', '');
 }
 
 function activateCustomerCategory(categoryKey, focusButton = false) {
@@ -1825,12 +1767,19 @@ async function handleCustomerCheckout() {
     }
   }
 
+  let rewardsMessage = '';
   if (customerState.profile) {
-    const updatedProfile = {
-      ...customerState.profile,
-      orderCount: Number(customerState.profile.orderCount || 0) + 1,
-    };
-    saveCustomerProfile(updatedProfile);
+    try {
+      const rewardsUpdate = await fetchJson('/api/customer/rewards/increment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      saveCustomerProfile(rewardsUpdate.profile);
+    } catch (error) {
+      rewardsMessage = String(error.message || '').includes('disabled')
+        ? ' Order was accepted, but rewards could not update while database writes are disabled.'
+        : ' Order was accepted, but rewards could not be updated.';
+    }
   }
 
   const rewardUsed = customerState.rewardDiscount > 0;
@@ -1841,7 +1790,7 @@ async function handleCustomerCheckout() {
   renderCustomerCart();
   setStatus(
     'customer-cart-status',
-    rewardUsed ? 'Order placed. Your free drink reward was applied.' : 'Order placed. Rewards progress has been updated.',
+    (rewardUsed ? 'Order placed. Your free drink reward was applied.' : 'Order placed. Rewards progress has been updated.') + rewardsMessage,
     'success'
   );
 }
@@ -1860,30 +1809,58 @@ function attachCustomerEventHandlers() {
     setCustomerQuantity(event.target.value);
   });
 
-  document.getElementById('customer-login-form').addEventListener('submit', (event) => {
+  document.getElementById('customer-login-form').addEventListener('submit', async (event) => {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const name = String(formData.get('name') || '').trim();
-    const email = String(formData.get('email') || '').trim();
-    const existingProfile = findCustomerProfileByEmail(email);
-    saveCustomerProfile({
-      ...(existingProfile || {}),
-      name: name || existingProfile?.name || '',
-      email,
-      orderCount: Number(existingProfile?.orderCount || 0),
-    });
-    renderCustomerRewards();
-    customerState.rewardDiscount = getCustomerRewardDiscount();
-    renderCustomerCart();
-    setStatus('customer-cart-status', existingProfile ? 'Rewards profile restored for this customer.' : 'Rewards profile saved for this browser.', 'success');
+    try {
+      const credentials = readCustomerRewardsCredentials();
+      validateCustomerRewardsCredentials(credentials);
+      const result = await fetchJson('/api/customer/rewards/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: credentials.email,
+          password: credentials.password,
+        }),
+      });
+      saveCustomerProfile(result.profile);
+      renderCustomerRewards();
+      customerState.rewardDiscount = getCustomerRewardDiscount();
+      renderCustomerCart();
+      setStatus('customer-cart-status', 'Rewards account signed in.', 'success');
+    } catch (error) {
+      setStatus('customer-cart-status', error.message || 'Unable to sign in to rewards.', 'error');
+    }
   });
 
-  document.getElementById('customer-logout').addEventListener('click', () => {
+  document.getElementById('customer-register').addEventListener('click', async () => {
+    try {
+      const credentials = readCustomerRewardsCredentials();
+      validateCustomerRewardsCredentials(credentials, true);
+      const result = await fetchJson('/api/customer/rewards/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(credentials),
+      });
+      saveCustomerProfile(result.profile);
+      renderCustomerRewards();
+      customerState.rewardDiscount = getCustomerRewardDiscount();
+      renderCustomerCart();
+      setStatus('customer-cart-status', 'Rewards account created and signed in.', 'success');
+    } catch (error) {
+      setStatus('customer-cart-status', error.message || 'Unable to create rewards account.', 'error');
+    }
+  });
+
+  document.getElementById('customer-logout').addEventListener('click', async () => {
+    await fetchJson('/api/customer/rewards/logout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
     clearCustomerProfile();
     renderCustomerRewards();
     customerState.rewardDiscount = getCustomerRewardDiscount();
     renderCustomerCart();
-    setStatus('customer-cart-status', 'Signed out. Rewards progress is saved for future sign-in.', 'neutral');
+    setStatus('customer-cart-status', 'Signed out of the rewards account.', 'neutral');
   });
 
   document.getElementById('customer-preview-order').addEventListener('click', refreshCustomerPreview);
@@ -1930,9 +1907,9 @@ function attachCustomerEventHandlers() {
 }
 
 async function bootCustomer() {
-  customerState.profile = getCustomerProfile();
   customerState.highContrast = loadCustomerContrastPreference();
   setCustomerContrastPreference(customerState.highContrast);
+  await loadCustomerRewardsSession();
   renderCustomerRewards();
   renderCustomerCart();
   attachCustomerEventHandlers();
