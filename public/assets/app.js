@@ -15,6 +15,7 @@ const managerState = {
   selectedInventoryId: null,
 };
 const CUSTOMER_PROFILE_KEY = 'customerRewardsProfile';
+const CUSTOMER_PROFILE_STORE_KEY = 'customerRewardsProfiles';
 const CUSTOMER_CONTRAST_KEY = 'customerHighContrast';
 const CUSTOMER_CATEGORY_ORDER = ['boba-tea', 'milk-tea', 'tea', 'seasonal'];
 const CUSTOMER_CATEGORY_META = {
@@ -44,6 +45,7 @@ const customerState = {
   profile: null,
   selectedProductId: null,
   highContrast: false,
+  lastDialogTrigger: null,
 };
 const INVENTORY_CATEGORY_OPTIONS = [
   'Milk Flavor',
@@ -1315,18 +1317,105 @@ async function loadManagerWorkspace() {
   setStatus('manager-dashboard-status', 'Manager workspace synced with the live database.', 'success');
 }
 
-function getCustomerProfile() {
+function normalizeCustomerEmail(email) {
+  return String(email || '').trim().toLowerCase();
+}
+
+function getCustomerProfileStore() {
+  try {
+    const raw = localStorage.getItem(CUSTOMER_PROFILE_STORE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveCustomerProfileStore(store) {
+  localStorage.setItem(CUSTOMER_PROFILE_STORE_KEY, JSON.stringify(store));
+}
+
+function migrateLegacyCustomerProfile() {
   try {
     const raw = localStorage.getItem(CUSTOMER_PROFILE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) {
+      return null;
+    }
+
+    const legacyProfile = JSON.parse(raw);
+    const normalizedEmail = normalizeCustomerEmail(legacyProfile?.email);
+    if (!normalizedEmail) {
+      return legacyProfile || null;
+    }
+
+    const store = getCustomerProfileStore();
+    if (!store[normalizedEmail]) {
+      store[normalizedEmail] = {
+        ...legacyProfile,
+        email: normalizedEmail,
+      };
+      saveCustomerProfileStore(store);
+    }
+    localStorage.removeItem(CUSTOMER_PROFILE_KEY);
+    return store[normalizedEmail];
   } catch {
     return null;
   }
 }
 
+function getCustomerProfile() {
+  const legacyProfile = migrateLegacyCustomerProfile();
+  if (legacyProfile) {
+    return legacyProfile;
+  }
+
+  try {
+    const raw = localStorage.getItem(CUSTOMER_PROFILE_KEY);
+    if (!raw) {
+      return null;
+    }
+
+    const sessionProfile = JSON.parse(raw);
+    const normalizedEmail = normalizeCustomerEmail(sessionProfile?.email);
+    if (!normalizedEmail) {
+      return sessionProfile || null;
+    }
+
+    const store = getCustomerProfileStore();
+    return store[normalizedEmail] || {
+      ...sessionProfile,
+      email: normalizedEmail,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function findCustomerProfileByEmail(email) {
+  const normalizedEmail = normalizeCustomerEmail(email);
+  if (!normalizedEmail) {
+    return null;
+  }
+
+  const store = getCustomerProfileStore();
+  return store[normalizedEmail] || null;
+}
+
 function saveCustomerProfile(profile) {
-  customerState.profile = profile;
-  localStorage.setItem(CUSTOMER_PROFILE_KEY, JSON.stringify(profile));
+  const normalizedEmail = normalizeCustomerEmail(profile?.email);
+  const nextProfile = {
+    ...profile,
+    email: normalizedEmail || String(profile?.email || '').trim(),
+  };
+
+  customerState.profile = nextProfile;
+  localStorage.setItem(CUSTOMER_PROFILE_KEY, JSON.stringify(nextProfile));
+
+  if (normalizedEmail) {
+    const store = getCustomerProfileStore();
+    store[normalizedEmail] = nextProfile;
+    saveCustomerProfileStore(store);
+  }
 }
 
 function clearCustomerProfile() {
@@ -1345,7 +1434,7 @@ function setCustomerContrastPreference(enabled) {
   const button = document.getElementById('customer-contrast-toggle');
   if (button) {
     button.setAttribute('aria-pressed', enabled ? 'true' : 'false');
-    button.textContent = enabled ? 'Standard Contrast' : 'High Contrast';
+    button.textContent = enabled ? 'Use Standard Contrast' : 'Enable High Contrast';
   }
 }
 
@@ -1418,6 +1507,51 @@ function resetCustomerCustomizationForm() {
   });
 }
 
+function setCustomerQuantity(nextValue) {
+  const quantityInput = document.getElementById('customer-qty');
+  if (!quantityInput) {
+    return;
+  }
+
+  quantityInput.value = String(Math.max(1, Number(nextValue) || 1));
+}
+
+function adjustCustomerQuantity(delta) {
+  const quantityInput = document.getElementById('customer-qty');
+  if (!quantityInput) {
+    return;
+  }
+
+  setCustomerQuantity((Number(quantityInput.value) || 1) + delta);
+}
+
+function getCustomerDialogFocusableElements() {
+  const dialog = document.getElementById('customer-customize-dialog');
+  if (!dialog) {
+    return [];
+  }
+
+  return Array.from(dialog.querySelectorAll(
+    'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+  )).filter((element) => !element.hasAttribute('hidden'));
+}
+
+function focusCustomerDialogStart() {
+  document.getElementById('customer-qty')?.focus();
+  document.getElementById('customer-qty')?.select?.();
+}
+
+function restoreCustomerDialogFocus() {
+  const lastTrigger = customerState.lastDialogTrigger;
+  customerState.lastDialogTrigger = null;
+  if (lastTrigger && document.contains(lastTrigger)) {
+    lastTrigger.focus();
+    return;
+  }
+
+  document.querySelector('.customer-category-button.active, .customer-product-tile')?.focus();
+}
+
 function renderCustomerRewards() {
   const heading = document.getElementById('customer-rewards-heading');
   const copy = document.getElementById('customer-rewards-copy');
@@ -1445,6 +1579,16 @@ function renderCustomerRewards() {
   setFieldValue('customer-email', customerState.profile.email || '');
 }
 
+function activateCustomerCategory(categoryKey, focusButton = false) {
+  customerState.activeCategory = categoryKey;
+  renderCustomerCategoryButtons();
+  renderCustomerProducts();
+
+  if (focusButton) {
+    document.querySelector(`.customer-category-button.customer-category-${categoryKey}`)?.focus();
+  }
+}
+
 function renderCustomerCategoryButtons() {
   const container = document.getElementById('customer-category-buttons');
   container.innerHTML = '';
@@ -1456,14 +1600,35 @@ function renderCustomerCategoryButtons() {
     button.className = `customer-category-button customer-category-${key}${customerState.activeCategory === key ? ' active' : ''}`;
     button.setAttribute('role', 'tab');
     button.setAttribute('aria-selected', customerState.activeCategory === key ? 'true' : 'false');
+    button.setAttribute('tabindex', '0');
     button.innerHTML = `
       <span class="customer-category-label">${escapeHtml(CUSTOMER_CATEGORY_META[key].label)}</span>
       <span class="customer-category-count">${count} item${count === 1 ? '' : 's'}</span>
     `;
     button.addEventListener('click', () => {
-      customerState.activeCategory = key;
-      renderCustomerCategoryButtons();
-      renderCustomerProducts();
+      activateCustomerCategory(key);
+    });
+    button.addEventListener('keydown', (event) => {
+      const currentIndex = CUSTOMER_CATEGORY_ORDER.indexOf(key);
+      if (currentIndex === -1) {
+        return;
+      }
+
+      if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+        event.preventDefault();
+        const nextKey = CUSTOMER_CATEGORY_ORDER[(currentIndex + 1) % CUSTOMER_CATEGORY_ORDER.length];
+        activateCustomerCategory(nextKey, true);
+      } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        const nextKey = CUSTOMER_CATEGORY_ORDER[(currentIndex - 1 + CUSTOMER_CATEGORY_ORDER.length) % CUSTOMER_CATEGORY_ORDER.length];
+        activateCustomerCategory(nextKey, true);
+      } else if (event.key === 'Home') {
+        event.preventDefault();
+        activateCustomerCategory(CUSTOMER_CATEGORY_ORDER[0], true);
+      } else if (event.key === 'End') {
+        event.preventDefault();
+        activateCustomerCategory(CUSTOMER_CATEGORY_ORDER[CUSTOMER_CATEGORY_ORDER.length - 1], true);
+      }
     });
     container.appendChild(button);
   });
@@ -1570,6 +1735,7 @@ async function refreshCustomerPreview() {
 }
 
 function openCustomerDialog(productId) {
+  customerState.lastDialogTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   customerState.selectedProductId = productId;
   const product = getCustomerSelectedProduct();
   if (!product) {
@@ -1584,6 +1750,7 @@ function openCustomerDialog(productId) {
   } else {
     dialog.setAttribute('open', 'true');
   }
+  focusCustomerDialogStart();
 }
 
 function closeCustomerDialog() {
@@ -1593,6 +1760,8 @@ function closeCustomerDialog() {
   } else {
     dialog.removeAttribute('open');
   }
+
+  restoreCustomerDialogFocus();
 }
 
 async function addCustomerSelectionToCart() {
@@ -1681,19 +1850,32 @@ function attachCustomerEventHandlers() {
   document.getElementById('customer-contrast-toggle').addEventListener('click', () => {
     setCustomerContrastPreference(!customerState.highContrast);
   });
+  document.getElementById('customer-qty-decrement').addEventListener('click', () => {
+    adjustCustomerQuantity(-1);
+  });
+  document.getElementById('customer-qty-increment').addEventListener('click', () => {
+    adjustCustomerQuantity(1);
+  });
+  document.getElementById('customer-qty').addEventListener('input', (event) => {
+    setCustomerQuantity(event.target.value);
+  });
 
   document.getElementById('customer-login-form').addEventListener('submit', (event) => {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
+    const name = String(formData.get('name') || '').trim();
+    const email = String(formData.get('email') || '').trim();
+    const existingProfile = findCustomerProfileByEmail(email);
     saveCustomerProfile({
-      name: String(formData.get('name') || '').trim(),
-      email: String(formData.get('email') || '').trim(),
-      orderCount: Number(customerState.profile?.orderCount || 0),
+      ...(existingProfile || {}),
+      name: name || existingProfile?.name || '',
+      email,
+      orderCount: Number(existingProfile?.orderCount || 0),
     });
     renderCustomerRewards();
     customerState.rewardDiscount = getCustomerRewardDiscount();
     renderCustomerCart();
-    setStatus('customer-cart-status', 'Rewards profile saved for this browser.', 'success');
+    setStatus('customer-cart-status', existingProfile ? 'Rewards profile restored for this customer.' : 'Rewards profile saved for this browser.', 'success');
   });
 
   document.getElementById('customer-logout').addEventListener('click', () => {
@@ -1701,12 +1883,46 @@ function attachCustomerEventHandlers() {
     renderCustomerRewards();
     customerState.rewardDiscount = getCustomerRewardDiscount();
     renderCustomerCart();
-    setStatus('customer-cart-status', 'Rewards profile removed from this browser.', 'neutral');
+    setStatus('customer-cart-status', 'Signed out. Rewards progress is saved for future sign-in.', 'neutral');
   });
 
   document.getElementById('customer-preview-order').addEventListener('click', refreshCustomerPreview);
   document.getElementById('customer-checkout').addEventListener('click', handleCustomerCheckout);
   document.getElementById('customer-close-dialog').addEventListener('click', closeCustomerDialog);
+  document.getElementById('customer-customize-dialog').addEventListener('close', restoreCustomerDialogFocus);
+  document.getElementById('customer-customize-dialog').addEventListener('keydown', (event) => {
+    const dialog = event.currentTarget;
+    if (!dialog.hasAttribute('open')) {
+      return;
+    }
+
+    if (event.key === 'Escape' && typeof dialog.showModal !== 'function') {
+      event.preventDefault();
+      closeCustomerDialog();
+      return;
+    }
+
+    if (event.key !== 'Tab') {
+      return;
+    }
+
+    const focusableElements = getCustomerDialogFocusableElements();
+    if (!focusableElements.length) {
+      return;
+    }
+
+    const first = focusableElements[0];
+    const last = focusableElements[focusableElements.length - 1];
+    const activeElement = document.activeElement;
+
+    if (event.shiftKey && activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  });
   document.getElementById('customer-customize-form').addEventListener('submit', async (event) => {
     event.preventDefault();
     await addCustomerSelectionToCart();

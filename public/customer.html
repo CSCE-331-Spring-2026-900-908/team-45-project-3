@@ -19,18 +19,16 @@
           <p class="eyebrow">Customer Interface</p>
           <h1>Build your drink and keep the cart in view.</h1>
           <p>
-            Pick a category, browse the live menu from the database, customize your drink, and
+            Pick a category, customize your drink, and
             track rewards on every order.
           </p>
         </div>
 
         <div class="customer-accessibility-tools" aria-label="Accessibility controls">
-          <button id="customer-contrast-toggle" class="ghost-button" type="button" aria-pressed="false">
-            High Contrast
+          <p class="customer-accessibility-label">Accessibility</p>
+          <button id="customer-contrast-toggle" class="ghost-button customer-contrast-toggle" type="button" aria-pressed="false">
+            Enable High Contrast
           </button>
-          <p class="muted-line">
-            Translation-friendly text stays selectable for browser translation tools and extensions.
-          </p>
         </div>
       </header>
 
@@ -84,7 +82,7 @@
                 <h2>Choose a drink family</h2>
               </div>
               <p id="customer-products-status" class="status-text" data-tone="neutral">
-                Loading live menu...
+                Loading menu...
               </p>
             </div>
 
@@ -132,7 +130,13 @@
       </main>
     </div>
 
-    <dialog id="customer-customize-dialog" class="customer-dialog" aria-labelledby="customer-dialog-title">
+    <dialog
+      id="customer-customize-dialog"
+      class="customer-dialog"
+      aria-labelledby="customer-dialog-title"
+      aria-describedby="customer-dialog-help"
+      aria-modal="true"
+    >
       <form id="customer-customize-form" method="dialog" class="customer-dialog-form">
         <div class="section-heading">
           <div>
@@ -148,7 +152,25 @@
         <div class="stack-layout compact-gap">
           <label class="field-block">
             <span>Quantity</span>
-            <input id="customer-qty" name="quantity" class="numeric-input" type="number" min="1" value="1" />
+            <div class="quantity-stepper">
+              <button
+                id="customer-qty-decrement"
+                class="ghost-button mini-button quantity-stepper-button"
+                type="button"
+                aria-label="Decrease quantity"
+              >
+                Minus
+              </button>
+              <input id="customer-qty" name="quantity" class="numeric-input" type="number" min="1" value="1" />
+              <button
+                id="customer-qty-increment"
+                class="ghost-button mini-button quantity-stepper-button"
+                type="button"
+                aria-label="Increase quantity"
+              >
+                Plus
+              </button>
+            </div>
           </label>
 
           <fieldset class="field-block">
@@ -184,7 +206,7 @@
           <div class="button-row">
             <button id="customer-add-to-cart" class="action-button" type="submit">Add To Cart</button>
           </div>
-          <p class="muted-line">All options are keyboard accessible and remain readable for translation tools.</p>
+          <p id="customer-dialog-help" class="muted-line">All options are keyboard accessible and remain readable for translation tools.</p>
         </div>
       </form>
     </dialog>
@@ -192,3 +214,4 @@
     <script src="/assets/app.js"></script>
   </body>
 </html>
+
