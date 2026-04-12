@@ -1940,6 +1940,7 @@ async function bootCustomer() {
   renderCustomerRewards();
   renderCustomerCart();
   attachCustomerEventHandlers();
+  attachChatEventHandlers();
 
   setStatus('customer-products-status', 'Loading live menu from the database...', 'neutral');
   const data = await fetchJson('/api/products');
@@ -2013,5 +2014,133 @@ document.getElementById('login-form')?.addEventListener('submit', async (e) => {
     document.getElementById('login-message').innerText = "Login failed. Please check your credentials.";
   }
 });
+
+// ── AI Chat Widget ────────────────────────────────────────────────────────────
+
+const chatState = {
+  messages: [],   // { role: 'user'|'assistant', content: string }[]
+  open: false,
+  busy: false,
+};
+
+function isChatPage() {
+  return document.body.dataset.page === 'customer';
+}
+
+function appendChatBubble(role, text) {
+  const container = document.getElementById('chat-messages');
+  if (!container) return null;
+  const div = document.createElement('div');
+  div.className = `chat-bubble chat-bubble-${role === 'user' ? 'user' : 'ai'}`;
+  div.textContent = text;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+  return div;
+}
+
+function appendTypingIndicator() {
+  const container = document.getElementById('chat-messages');
+  if (!container) return null;
+  const div = document.createElement('div');
+  div.className = 'chat-bubble chat-bubble-typing';
+  div.textContent = 'Thinking…';
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+  return div;
+}
+
+function setChatBusy(busy) {
+  chatState.busy = busy;
+  const input = document.getElementById('chat-input');
+  const send = document.getElementById('chat-send');
+  if (input) input.disabled = busy;
+  if (send) send.disabled = busy;
+}
+
+async function sendChatMessage(userText) {
+  if (chatState.busy || !userText.trim()) return;
+
+  const text = userText.trim().slice(0, 500);
+  chatState.messages.push({ role: 'user', content: text });
+  appendChatBubble('user', text);
+
+  const typingDiv = appendTypingIndicator();
+  setChatBusy(true);
+
+  try {
+    const data = await fetchJson('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: chatState.messages }),
+    });
+
+    if (typingDiv) typingDiv.remove();
+    const reply = data.reply || 'Sorry, I could not generate a response.';
+    chatState.messages.push({ role: 'assistant', content: reply });
+    appendChatBubble('assistant', reply);
+  } catch (error) {
+    if (typingDiv) typingDiv.remove();
+    const errMsg = error.message || 'Something went wrong. Please try again.';
+    appendChatBubble('assistant', errMsg);
+  } finally {
+    setChatBusy(false);
+    document.getElementById('chat-input')?.focus();
+  }
+}
+
+function openChatWidget() {
+  chatState.open = true;
+  const widget = document.getElementById('chat-widget');
+  const toggle = document.getElementById('chat-toggle');
+  if (widget) widget.hidden = false;
+  if (toggle) toggle.setAttribute('aria-expanded', 'true');
+
+  // Show a greeting on first open
+  const container = document.getElementById('chat-messages');
+  if (container && !container.children.length) {
+    appendChatBubble('assistant', 'Hi! I\'m your Reveille Bubble Tea assistant. Ask me anything about the menu, customizations, or our rewards program!');
+  }
+
+  document.getElementById('chat-input')?.focus();
+}
+
+function closeChatWidget() {
+  chatState.open = false;
+  const widget = document.getElementById('chat-widget');
+  const toggle = document.getElementById('chat-toggle');
+  if (widget) widget.hidden = true;
+  if (toggle) {
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.focus();
+  }
+}
+
+function attachChatEventHandlers() {
+  const toggle = document.getElementById('chat-toggle');
+  const closeBtn = document.getElementById('chat-close');
+  const form = document.getElementById('chat-form');
+  const input = document.getElementById('chat-input');
+
+  if (!toggle) return; // not on customer page
+
+  toggle.addEventListener('click', () => {
+    if (chatState.open) closeChatWidget();
+    else openChatWidget();
+  });
+
+  closeBtn?.addEventListener('click', closeChatWidget);
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const text = input?.value || '';
+    if (input) input.value = '';
+    await sendChatMessage(text);
+  });
+
+  // Close on Escape when widget is open
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && chatState.open) closeChatWidget();
+  });
+}
 
 boot();

@@ -17,7 +17,12 @@ const path = require('node:path');
 const session = require('express-session');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const Anthropic = require('@anthropic-ai/sdk');
 const db = require('./database');
+
+const anthropic = process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY !== 'your-anthropic-api-key-here'
+  ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  : null;
 
 const port = Number(process.env.PORT) || 3000;
 const publicDir = path.join(__dirname, 'public');
@@ -393,6 +398,65 @@ function createApp() {
     ensureWritesEnabled();
     const employeeId = Number(req.query.employeeId);
     res.json({ source: 'database', rows: await db.deleteEmployee(employeeId) });
+  }));
+
+  // --- AI Chatbot route ---
+  app.post('/api/chat', asyncHandler(async (req, res) => {
+    if (!anthropic) {
+      res.status(503).json({ error: 'Chatbot is not configured. Set ANTHROPIC_API_KEY in your .env file.' });
+      return;
+    }
+
+    const userMessages = Array.isArray(req.body?.messages) ? req.body.messages : [];
+    if (!userMessages.length) {
+      res.status(400).json({ error: 'At least one message is required.' });
+      return;
+    }
+
+    // Build live menu context so the AI knows what's actually available
+    const menuItems = await db.fetchMenuProducts(false);
+    const menuText = menuItems.length
+      ? menuItems.map((item) => `  • ${item.name} (${item.category}) — $${Number(item.price).toFixed(2)}`).join('\n')
+      : '  (Menu is currently unavailable)';
+
+    const systemPrompt =
+      'You are a friendly and helpful assistant for Reveille Bubble Tea, a boba tea shop. ' +
+      'Your job is to help customers with menu information, drink recommendations, and ordering guidance.\n\n' +
+      `Current menu:\n${menuText}\n\n` +
+      'Drink customization options:\n' +
+      '  • Size: Small, Medium, or Large\n' +
+      '  • Sweetness: 0%, 25%, 50%, 75%, or 100%\n' +
+      '  • Toppings: Boba, Crystal Boba, Lychee Jelly, Pudding\n\n' +
+      'Rewards program: Customers earn 1 point per order. Every 5 orders earns 1 free drink credit ' +
+      '(the cheapest drink in the cart is free). Credits stack and are tracked automatically when signed in.\n\n' +
+      'Guidelines:\n' +
+      '  • Be warm, concise, and enthusiastic about boba tea\n' +
+      '  • Recommend specific drinks based on customer preferences\n' +
+      '  • Only mention items that appear on the current menu above\n' +
+      '  • Keep responses to 2–4 sentences when possible\n' +
+      '  • You cannot place orders yourself — guide customers to use the menu on the page\n' +
+      '  • If asked about something unrelated to the shop, politely redirect the conversation';
+
+    // Validate and sanitize messages — only allow user/assistant roles
+    const safeMessages = userMessages
+      .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+      .slice(-20) // keep last 20 turns to stay within token limits
+      .map((m) => ({ role: m.role, content: String(m.content).slice(0, 2000) }));
+
+    if (!safeMessages.length || safeMessages[safeMessages.length - 1].role !== 'user') {
+      res.status(400).json({ error: 'The last message must be from the user.' });
+      return;
+    }
+
+    const response = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 512,
+      system: systemPrompt,
+      messages: safeMessages,
+    });
+
+    const reply = response.content[0]?.type === 'text' ? response.content[0].text : '';
+    res.json({ reply });
   }));
 
   // --- Fallback handlers ---
