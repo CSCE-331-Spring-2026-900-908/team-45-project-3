@@ -400,6 +400,33 @@ function createApp() {
     res.json({ source: 'database', rows: await db.deleteEmployee(employeeId) });
   }));
 
+  // --- Machine Translation route ---
+  app.post('/api/translate', asyncHandler(async (req, res) => {
+    const { text, targetLang } = req.body || {};
+
+    if (!text || !targetLang) {
+      res.status(400).json({ error: 'text and targetLang are required.' });
+      return;
+    }
+
+    if (targetLang === 'en') {
+      res.json({ translatedText: text });
+      return;
+    }
+
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(String(text).slice(0, 500))}&langpair=en|${encodeURIComponent(targetLang)}`;
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      res.status(502).json({ error: 'Translation service unavailable.' });
+      return;
+    }
+
+    const data = await response.json();
+    const translatedText = data?.responseData?.translatedText || text;
+    res.json({ translatedText });
+  }));
+
   // --- AI Chatbot route ---
   app.post('/api/chat', asyncHandler(async (req, res) => {
     if (!anthropic) {

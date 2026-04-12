@@ -16,19 +16,30 @@
 
       <header class="page-header customer-hero">
         <div class="customer-hero-copy">
-          <p class="eyebrow">Customer Interface</p>
-          <h1>Build your drink and keep the cart in view.</h1>
-          <p>
+          <p class="eyebrow" data-i18n="Customer Interface">Customer Interface</p>
+          <h1 data-i18n="Build your drink and keep the cart in view.">Build your drink and keep the cart in view.</h1>
+          <p data-i18n="Pick a category, customize your drink, and track rewards on every order.">
             Pick a category, customize your drink, and
             track rewards on every order.
           </p>
         </div>
 
         <div class="customer-accessibility-tools" aria-label="Accessibility controls">
-          <p class="customer-accessibility-label">Accessibility</p>
-          <button id="customer-contrast-toggle" class="ghost-button customer-contrast-toggle" type="button" aria-pressed="false">
+          <p class="customer-accessibility-label" data-i18n="Accessibility &amp; Language">Accessibility &amp; Language</p>
+          <button id="customer-contrast-toggle" class="ghost-button customer-contrast-toggle" type="button" aria-pressed="false" data-i18n="Enable High Contrast">
             Enable High Contrast
           </button>
+          <label class="customer-lang-label">
+            <span data-i18n="Language">Language</span>
+            <select id="customer-lang-select" class="customer-lang-select" aria-label="Select display language">
+              <option value="en">English</option>
+              <option value="es">Español</option>
+              <option value="fr">Français</option>
+              <option value="zh">中文</option>
+              <option value="ko">한국어</option>
+              <option value="vi">Tiếng Việt</option>
+            </select>
+          </label>
         </div>
       </header>
 
@@ -37,9 +48,9 @@
           <section class="content-card">
             <div class="section-heading">
               <div>
-                <p class="section-label">Rewards Login</p>
-                <h2 id="customer-menu-heading">Welcome to the menu</h2>
-                <p class="muted-line">
+                <p class="section-label" data-i18n="Rewards Login">Rewards Login</p>
+                <h2 id="customer-menu-heading" data-i18n="Welcome to the menu">Welcome to the menu</h2>
+                <p class="muted-line" data-i18n="Sign in with your name and email to track the free-drink reward on every 5th order.">
                   Sign in with your name and email to track the free-drink reward on every 5th order.
                 </p>
               </div>
@@ -48,26 +59,26 @@
             <div class="customer-account-grid">
               <form id="customer-login-form" class="auth-form compact-auth-form" autocomplete="on">
                 <label>
-                  <span>Name for rewards account</span>
+                  <span data-i18n="Name for rewards account">Name for rewards account</span>
                   <input id="customer-name" name="name" type="text" autocomplete="name" />
                 </label>
                 <label>
-                  <span>Email</span>
+                  <span data-i18n="Email">Email</span>
                   <input id="customer-email" name="email" type="email" autocomplete="email" required />
                 </label>
                 <label>
-                  <span>Password</span>
+                  <span data-i18n="Password">Password</span>
                   <input id="customer-password" name="password" type="password" autocomplete="current-password" minlength="8" required />
                 </label>
                 <div class="button-row customer-login-actions">
-                  <button id="customer-login" class="action-button" type="submit">Sign In</button>
-                  <button id="customer-register" class="ghost-button" type="button">Create Account</button>
-                  <button id="customer-logout" class="ghost-button" type="button">Sign Out</button>
+                  <button id="customer-login" class="action-button" type="submit" data-i18n="Sign In">Sign In</button>
+                  <button id="customer-register" class="ghost-button" type="button" data-i18n="Create Account">Create Account</button>
+                  <button id="customer-logout" class="ghost-button" type="button" data-i18n="Sign Out">Sign Out</button>
                 </div>
               </form>
 
               <section class="customer-rewards-card" aria-labelledby="customer-rewards-heading">
-                <p class="section-label">Rewards Status</p>
+                <p class="section-label" data-i18n="Rewards Status">Rewards Status</p>
                 <h3 id="customer-rewards-heading">No rewards profile yet</h3>
                 <p id="customer-rewards-id" class="muted-line" style="font-size:0.8em;opacity:0.7;"></p>
                 <p id="customer-rewards-copy" class="muted-line">
@@ -84,8 +95,8 @@
           <section class="content-card">
             <div class="section-heading">
               <div>
-                <p class="section-label">Categories</p>
-                <h2>Choose a drink family</h2>
+                <p class="section-label" data-i18n="Categories">Categories</p>
+                <h2 data-i18n="Choose a drink family">Choose a drink family</h2>
               </div>
               <p id="customer-products-status" class="status-text" data-tone="neutral">
                 Loading menu...
@@ -98,7 +109,7 @@
           <section class="content-card">
             <div class="section-heading">
               <div>
-                <p class="section-label">Live Menu</p>
+                <p class="section-label" data-i18n="Live Menu">Live Menu</p>
                 <h2 id="customer-active-category">Products</h2>
                 <p id="customer-category-description" class="muted-line"></p>
               </div>
@@ -110,23 +121,23 @@
         </section>
 
         <aside id="customer-cart-panel" class="content-card customer-cart-panel" aria-labelledby="customer-cart-heading">
-          <p class="section-label">Shopping Cart</p>
-          <h2 id="customer-cart-heading">Your order</h2>
-          <p class="muted-line">This cart stays visible while you browse.</p>
+          <p class="section-label" data-i18n="Shopping Cart">Shopping Cart</p>
+          <h2 id="customer-cart-heading" data-i18n="Your order">Your order</h2>
+          <p class="muted-line" data-i18n="This cart stays visible while you browse.">This cart stays visible while you browse.</p>
 
           <div id="customer-reward-banner" class="customer-reward-banner" hidden></div>
           <div id="customer-cart-lines" class="cart-list"></div>
 
           <div class="summary-grid">
-            <div><span>Subtotal</span><strong id="customer-subtotal">$0.00</strong></div>
-            <div><span>Tax</span><strong id="customer-tax">$0.00</strong></div>
-            <div><span>Rewards</span><strong id="customer-discount">$0.00</strong></div>
-            <div><span>Total</span><strong id="customer-total">$0.00</strong></div>
+            <div><span data-i18n="Subtotal">Subtotal</span><strong id="customer-subtotal">$0.00</strong></div>
+            <div><span data-i18n="Tax">Tax</span><strong id="customer-tax">$0.00</strong></div>
+            <div><span data-i18n="Rewards">Rewards</span><strong id="customer-discount">$0.00</strong></div>
+            <div><span data-i18n="Total">Total</span><strong id="customer-total">$0.00</strong></div>
           </div>
 
           <div class="button-row">
-            <button id="customer-preview-order" class="ghost-button" type="button">Refresh Total</button>
-            <button id="customer-checkout" class="action-button" type="button">Place Order</button>
+            <button id="customer-preview-order" class="ghost-button" type="button" data-i18n="Refresh Total">Refresh Total</button>
+            <button id="customer-checkout" class="action-button" type="button" data-i18n="Place Order">Place Order</button>
           </div>
 
           <p id="customer-cart-status" class="status-text" data-tone="neutral">
@@ -146,7 +157,7 @@
       <form id="customer-customize-form" method="dialog" class="customer-dialog-form">
         <div class="section-heading">
           <div>
-            <p class="section-label">Customize Drink</p>
+            <p class="section-label" data-i18n="Customize Drink">Customize Drink</p>
             <h2 id="customer-dialog-title">Drink</h2>
             <p id="customer-dialog-price" class="muted-line"></p>
           </div>
@@ -157,7 +168,7 @@
 
         <div class="stack-layout compact-gap">
           <label class="field-block">
-            <span>Quantity</span>
+            <span data-i18n="Quantity">Quantity</span>
             <div class="quantity-stepper">
               <button
                 id="customer-qty-decrement"
@@ -180,7 +191,7 @@
           </label>
 
           <fieldset class="field-block">
-            <legend>Size</legend>
+            <legend data-i18n="Size">Size</legend>
             <div class="customer-choice-grid">
               <label><input type="radio" name="customer-size" value="Small" /> Small</label>
               <label><input type="radio" name="customer-size" value="Medium" checked /> Medium</label>
@@ -189,7 +200,7 @@
           </fieldset>
 
           <fieldset class="field-block">
-            <legend>Sweetness</legend>
+            <legend data-i18n="Sweetness">Sweetness</legend>
             <div class="customer-choice-grid">
               <label><input type="radio" name="customer-sugar" value="0" /> 0%</label>
               <label><input type="radio" name="customer-sugar" value="25" /> 25%</label>
@@ -200,17 +211,17 @@
           </fieldset>
 
           <fieldset class="field-block">
-            <legend>Toppings</legend>
+            <legend data-i18n="Toppings">Toppings</legend>
             <div class="check-grid customer-topping-grid">
-              <label><input type="checkbox" name="customer-topping" value="Boba" /> Boba</label>
-              <label><input type="checkbox" name="customer-topping" value="Crystal Boba" /> Crystal Boba</label>
-              <label><input type="checkbox" name="customer-topping" value="Lychee Jelly" /> Lychee Jelly</label>
-              <label><input type="checkbox" name="customer-topping" value="Pudding" /> Pudding</label>
+              <label><input type="checkbox" name="customer-topping" value="Boba" /> <span data-i18n="Boba">Boba</span></label>
+              <label><input type="checkbox" name="customer-topping" value="Crystal Boba" /> <span data-i18n="Crystal Boba">Crystal Boba</span></label>
+              <label><input type="checkbox" name="customer-topping" value="Lychee Jelly" /> <span data-i18n="Lychee Jelly">Lychee Jelly</span></label>
+              <label><input type="checkbox" name="customer-topping" value="Pudding" /> <span data-i18n="Pudding">Pudding</span></label>
             </div>
           </fieldset>
 
           <div class="button-row">
-            <button id="customer-add-to-cart" class="action-button" type="submit">Add To Cart</button>
+            <button id="customer-add-to-cart" class="action-button" type="submit" data-i18n="Add To Cart">Add To Cart</button>
           </div>
           <p id="customer-dialog-help" class="muted-line">All options are keyboard accessible and remain readable for translation tools.</p>
         </div>

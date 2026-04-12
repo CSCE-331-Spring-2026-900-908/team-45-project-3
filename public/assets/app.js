@@ -46,6 +46,80 @@ const customerState = {
   highContrast: false,
   lastDialogTrigger: null,
 };
+// ── Translation ───────────────────────────────────────────────────────────────
+const SUPPORTED_LANGUAGES = [
+  { code: 'en', label: 'English' },
+  { code: 'es', label: 'Español' },
+  { code: 'fr', label: 'Français' },
+  { code: 'zh', label: '中文' },
+  { code: 'ko', label: '한국어' },
+  { code: 'vi', label: 'Tiếng Việt' },
+];
+
+const translationCache = {}; // { 'lang:text': translatedText }
+let currentLang = 'en';
+
+// Sync lookup — returns cached translation or original text
+function t(text) {
+  if (currentLang === 'en' || !text) return text;
+  return translationCache[`${currentLang}:${text}`] || text;
+}
+
+// Fetch one translation from the backend (cached)
+async function translateOne(text, lang) {
+  if (!text || lang === 'en') return text;
+  const key = `${lang}:${text}`;
+  if (translationCache[key]) return translationCache[key];
+  try {
+    const data = await fetchJson('/api/translate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, targetLang: lang }),
+    });
+    translationCache[key] = data.translatedText || text;
+    return translationCache[key];
+  } catch {
+    return text;
+  }
+}
+
+// Translate all [data-i18n] elements + pre-cache product names, then re-render
+async function applyLanguage(lang) {
+  currentLang = lang;
+
+  if (lang === 'en') {
+    // Restore all static elements to their original English text
+    document.querySelectorAll('[data-i18n]').forEach((el) => {
+      el.textContent = el.dataset.i18n;
+    });
+    renderCustomerCategoryButtons();
+    renderCustomerProducts();
+    return;
+  }
+
+  // Collect all unique strings that need translating
+  const staticTexts = Array.from(document.querySelectorAll('[data-i18n]'))
+    .map((el) => el.dataset.i18n)
+    .filter(Boolean);
+
+  const productTexts = customerState.products.flatMap((p) => [p.name, p.category]);
+  const categoryTexts = Object.values(CUSTOMER_CATEGORY_META).flatMap((m) => [m.label, m.description]);
+
+  const allUnique = [...new Set([...staticTexts, ...productTexts, ...categoryTexts])];
+
+  // Fetch all translations in parallel
+  await Promise.all(allUnique.map((text) => translateOne(text, lang)));
+
+  // Apply to static [data-i18n] elements
+  document.querySelectorAll('[data-i18n]').forEach((el) => {
+    el.textContent = t(el.dataset.i18n);
+  });
+
+  // Re-render dynamic sections (they call t() internally now)
+  renderCustomerCategoryButtons();
+  renderCustomerProducts();
+}
+
 const INVENTORY_CATEGORY_OPTIONS = [
   'Milk Flavor',
   'Tea Flavor',
@@ -1562,7 +1636,7 @@ function renderCustomerCategoryButtons() {
     button.setAttribute('aria-selected', customerState.activeCategory === key ? 'true' : 'false');
     button.setAttribute('tabindex', '0');
     button.innerHTML = `
-      <span class="customer-category-label">${escapeHtml(CUSTOMER_CATEGORY_META[key].label)}</span>
+      <span class="customer-category-label">${escapeHtml(t(CUSTOMER_CATEGORY_META[key].label))}</span>
       <span class="customer-category-count">${count} item${count === 1 ? '' : 's'}</span>
     `;
     button.addEventListener('click', () => {
@@ -1599,8 +1673,8 @@ function renderCustomerProducts() {
   const visible = getCustomerProductsForActiveCategory();
   const meta = CUSTOMER_CATEGORY_META[customerState.activeCategory];
 
-  setText('customer-active-category', meta.label);
-  setText('customer-category-description', meta.description);
+  setText('customer-active-category', t(meta.label));
+  setText('customer-category-description', t(meta.description));
   setText('customer-product-count', `${visible.length} item${visible.length === 1 ? '' : 's'} available`);
 
   container.innerHTML = '';
@@ -1615,12 +1689,12 @@ function renderCustomerProducts() {
     tile.className = `customer-product-tile customer-tile-${normalizeCustomerCategory(item)}`;
     tile.innerHTML = `
       <span class="customer-product-overlay">
-        <span class="section-label">${escapeHtml(item.category || meta.label)}</span>
-        <strong>${escapeHtml(item.name)}</strong>
+        <span class="section-label">${escapeHtml(t(item.category) || t(meta.label))}</span>
+        <strong>${escapeHtml(t(item.name))}</strong>
         <span>${formatCurrency(item.price)}</span>
       </span>
     `;
-    tile.setAttribute('aria-label', `${item.name}, ${formatCurrency(item.price)}. Open customization options.`);
+    tile.setAttribute('aria-label', `${t(item.name)}, ${formatCurrency(item.price)}. Open customization options.`);
     tile.addEventListener('click', () => openCustomerDialog(item.id));
     container.appendChild(tile);
   });
@@ -1888,6 +1962,13 @@ function attachCustomerEventHandlers() {
     customerState.rewardDiscount = getCustomerRewardDiscount();
     renderCustomerCart();
     setStatus('customer-cart-status', 'Signed out of the rewards account.', 'neutral');
+  });
+
+  document.getElementById('customer-lang-select')?.addEventListener('change', async (event) => {
+    const lang = event.target.value;
+    setStatus('customer-products-status', lang === 'en' ? 'Restoring English...' : 'Translating page...', 'neutral');
+    await applyLanguage(lang);
+    setStatus('customer-products-status', lang === 'en' ? 'English restored.' : 'Translation applied.', 'success');
   });
 
   document.getElementById('customer-preview-order').addEventListener('click', refreshCustomerPreview);
