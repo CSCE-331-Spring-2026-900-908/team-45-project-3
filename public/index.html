@@ -3,40 +3,52 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tea Portal</title>
+    <title>Reveille Bubble Tea — Portal</title>
     <link rel="stylesheet" href="/assets/styles.css" />
   </head>
   <body data-page="portal">
     <div class="page-shell">
       <header class="hero">
-        <p class="eyebrow">Web Portal</p>
+        <div class="hero-copy">
+          <p class="eyebrow">Reveille Bubble Tea</p>
+          <h1>Staff Portal</h1>
+          <p>Select your interface below to get started.</p>
+        </div>
       </header>
 
-      <main>
+      <main class="stack-layout">
         <section class="card-grid">
-          <a class="role-card" href="/staff" data-enter-role="staff">
-            <span class="role-label">Cashier Interface</span>
-            <h2>Staff View</h2>
+          <a class="role-card" href="/manager" data-enter-role="manager">
+            <span class="role-label">Management</span>
+            <h2>Manager View</h2>
+            <p>Reports, menu management, inventory, and employee administration.</p>
           </a>
 
-          <a class="role-card" href="/manager" data-enter-role="manager">
-            <span class="role-label">Operations Interface</span>
-            <h2>Manager View</h2>
+          <a class="role-card" href="/staff" data-enter-role="staff">
+            <span class="role-label">Cashier</span>
+            <h2>Staff View</h2>
+            <p>Point-of-sale ordering, cart management, and payment processing.</p>
           </a>
 
           <a class="role-card" href="/customer" data-enter-role="customer">
-            <span class="role-label">Self-Service Interface</span>
+            <span class="role-label">Self-Service Kiosk</span>
             <h2>Customer View</h2>
+            <p>Browse the full menu, customize drinks, and track rewards.</p>
           </a>
         </section>
-        <br>
-        <br>
-        <div class="weather-widget">
-          <h2>Local Weather Forecast</h2>
-          <div id="forecast-container">
-            <div class="loading">Loading latest data from the National Weather Service...</div>
+
+        <section class="content-card">
+          <div class="section-heading">
+            <div>
+              <p class="section-label">Weather</p>
+              <h2>College Station Forecast</h2>
+              <p class="muted-line">Current conditions near the shop — updated live from the National Weather Service.</p>
+            </div>
           </div>
-        </div>
+          <div id="forecast-container">
+            <p class="muted-line">Loading weather data...</p>
+          </div>
+        </section>
       </main>
     </div>
 
@@ -47,62 +59,44 @@
 
       async function fetchNWSForecast() {
         const container = document.getElementById('forecast-container');
-        
         try {
-          // Step 1: Request the metadata for the coordinates
-          const pointsResponse = await fetch(`https://api.weather.gov/points/${lat},${lon}`);
-          
-          if (!pointsResponse.ok) {
-            throw new Error('Could not find location data. Please check the coordinates.');
-          }
-          
-          const pointsData = await pointsResponse.json();
-          
-          // Step 2: Extract the forecast URL and fetch the actual forecast
-          const forecastUrl = pointsData.properties.forecast;
-          const forecastResponse = await fetch(forecastUrl);
-          
-          if (!forecastResponse.ok) {
-            throw new Error('Could not retrieve forecast data.');
-          }
-          
-          const forecastData = await forecastResponse.json();
-          const periods = forecastData.properties.periods;
-          
-          // Clear the loading text
+          const pointsRes = await fetch(`https://api.weather.gov/points/${lat},${lon}`);
+          if (!pointsRes.ok) throw new Error('Could not reach the weather service.');
+
+          const pointsData = await pointsRes.json();
+          const forecastRes = await fetch(pointsData.properties.forecast);
+          if (!forecastRes.ok) throw new Error('Could not load forecast data.');
+
+          const forecastData = await forecastRes.json();
+          const periods = forecastData.properties.periods.slice(0, 7);
+
           container.innerHTML = '';
-          
-          // Step 3: Loop through the next 7 periods (~3.5 days) and create HTML for each
-          // The NWS API usually returns 14 periods (7 days, day/night)
-          const periodsToDisplay = periods.slice(0, 7); 
-          
-          periodsToDisplay.forEach(period => {
-            const card = document.createElement('div');
-            card.className = 'forecast-card';
-            
-            // Determine a simple color class based on temperature
+          const grid = document.createElement('div');
+          grid.className = 'forecast-grid';
+
+          periods.forEach((period) => {
             let tempClass = 'cool';
             if (period.temperature >= 85) tempClass = 'hot';
             else if (period.temperature >= 70) tempClass = 'warm';
             else if (period.temperature <= 45) tempClass = 'cold';
 
+            const card = document.createElement('div');
+            card.className = 'forecast-card';
             card.innerHTML = `
               <h3>${period.name}</h3>
-              <img src="${period.icon}" alt="${period.shortForecast}">
+              <img src="${period.icon}" alt="${period.shortForecast}" width="86" height="86" />
               <p class="temp ${tempClass}">${period.temperature}&deg;${period.temperatureUnit}</p>
               <p class="desc">${period.shortForecast}</p>
             `;
-            
-            container.appendChild(card);
+            grid.appendChild(card);
           });
 
+          container.appendChild(grid);
         } catch (error) {
-          container.innerHTML = `<div class="error">⚠️ ${error.message}</div>`;
-          console.error('NWS API Error:', error);
+          container.innerHTML = `<p class="status-text" data-tone="error">Unable to load weather: ${error.message}</p>`;
         }
       }
 
-      // Initialize the fetch when the script loads
       fetchNWSForecast();
     </script>
   </body>

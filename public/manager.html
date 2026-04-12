@@ -8,10 +8,6 @@
   </head>
   <body data-page="manager">
     <div class="page-shell inner-page">
-      <nav class="top-nav">
-        <a href="/">Portal</a>
-      </nav>
-
       <header class="page-header">
         <p class="eyebrow">Manager Interface</p>
       </header>
@@ -33,37 +29,11 @@
             <button class="action-button" type="submit">Sign In</button>
           </form>
 
-          <div style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 15px; width: 100%; display: flex; flex-direction: column; align-items: center;">
-            
-            <p style="
-              text-align: center !important; 
-              margin: 0 0 15px 0 !important; 
-              font-size: 0.8rem; 
-              color: #666; 
-              width: 100%;
-              display: block;
-            ">— OR —</p>
-            
-            <div style="display: flex; justify-content: center; width: 100%;">
-              <button 
-                type="button" 
-                class="action-button" 
-                style="
-                  background-color: #fff !important; 
-                  color: #444 !important; 
-                  border: 1px solid #ddd !important; 
-                  width: 240px !important; 
-                  margin: 0 !important; 
-                  display: block !important;
-                  float: none !important;
-                  transform: none !important;
-                  padding: 10px 0 !important;
-                "
-                onclick="window.location.href='/auth/google'"
-              >
-                Sign in with Google
-              </button>
-            </div>
+          <div class="google-signin-divider">
+            <p class="google-signin-or">— OR —</p>
+            <button type="button" class="google-signin-button" onclick="window.location.href='/auth/google'">
+              Sign in with Google
+            </button>
           </div>
 
           <p id="manager-login-status" class="status-text" data-tone="neutral">
@@ -78,7 +48,7 @@
                 <p class="section-label">Signed In</p>
                 <h2 id="manager-session-name">Manager</h2>
               </div>
-              <button id="manager-sign-out" class="ghost-button" type="button">Exit to Portal</button>
+              <button id="manager-sign-out" class="ghost-button" type="button">Sign Out</button>
             </div>
             <p id="manager-dashboard-status" class="status-text" data-tone="neutral">Waiting for manager data...</p>
           </section>
@@ -119,6 +89,18 @@
                 <button id="report-x" class="ghost-button" type="button">X-Report (Today)</button>
                 <button id="report-z" class="ghost-button" type="button">Z-Report (Close Day)</button>
                 <button id="report-reset-z" class="ghost-button" type="button">Reset Z-Report</button>
+              </div>
+
+              <div id="z-report-signature-section" class="z-report-signature-section" hidden>
+                <form id="z-report-signature-form" class="compact-form">
+                  <p class="section-label">Close Day — Signatures Required</p>
+                  <label><span>Staff Signature</span><input name="employeeSignature" type="text" placeholder="Closing employee name" required /></label>
+                  <label><span>Manager Signature</span><input name="managerSignature" type="text" placeholder="Manager name" required /></label>
+                  <div class="button-row">
+                    <button class="action-button" type="submit">Generate Z-Report</button>
+                    <button id="z-report-cancel" class="ghost-button" type="button">Cancel</button>
+                  </div>
+                </form>
               </div>
 
               <form id="inventory-usage-form" class="compact-form inline-form">

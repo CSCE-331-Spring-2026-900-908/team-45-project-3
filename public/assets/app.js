@@ -512,7 +512,15 @@ async function bootStaff() {
   // 5. Sign Out & Navigation
   document.getElementById('staff-sign-out').addEventListener('click', () => {
     clearRoleSession();
-    window.location.replace('/');
+    staffState.cart = [];
+    staffState.products = [];
+    staffState.selectedProductId = null;
+    staffState.preview = { ...EMPTY_PREVIEW };
+    document.getElementById('staff-workspace').hidden = true;
+    document.getElementById('staff-login-card').hidden = false;
+    document.querySelector('#staff-login-form [name="username"]').value = '';
+    document.querySelector('#staff-login-form [name="password"]').value = '';
+    setStatus('staff-login-status', 'Signed out successfully.', 'neutral');
   });
 
   // 6. UI Interaction Handlers
@@ -1098,8 +1106,10 @@ async function bootManager() {
   // 6. Handle Sign Out
   document.getElementById('manager-sign-out').addEventListener('click', () => {
     clearRoleSession();
-    // Also redirect to a logout route if you want to clear the Google session server-side
-    window.location.replace('/');
+    document.getElementById('manager-workspace').hidden = true;
+    document.getElementById('manager-login-card').hidden = false;
+    document.getElementById('manager-login-form')?.reset();
+    setStatus('manager-login-status', 'Signed out successfully.', 'neutral');
   });
 
   // 7. Attach Report Handlers
@@ -1112,12 +1122,25 @@ async function bootManager() {
     await runReportWithStatus(() => runReportInventoryUsage(event.currentTarget));
   });
 
-  // 8. Attach Z-Report Handler
-  document.getElementById('report-z').addEventListener('click', async () => {
-    const employeeSignature = window.prompt('Closing staff signature:');
-    if (!employeeSignature) return;
-    const managerSignature = window.prompt('Manager signature:');
-    if (!managerSignature) return;
+  // 8. Attach Z-Report Handler — shows inline signature form instead of window.prompt
+  document.getElementById('report-z').addEventListener('click', () => {
+    document.getElementById('z-report-signature-section').hidden = false;
+    document.querySelector('#z-report-signature-form [name="employeeSignature"]').focus();
+    setStatus('manager-reports-status', 'Enter signatures below then click Generate Z-Report.', 'neutral');
+  });
+
+  document.getElementById('z-report-cancel').addEventListener('click', () => {
+    document.getElementById('z-report-signature-section').hidden = true;
+    document.getElementById('z-report-signature-form').reset();
+  });
+
+  document.getElementById('z-report-signature-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const employeeSignature = String(formData.get('employeeSignature') || '').trim();
+    const managerSignature = String(formData.get('managerSignature') || '').trim();
+    document.getElementById('z-report-signature-section').hidden = true;
+    event.currentTarget.reset();
     try {
       const result = await fetchJson('/api/reports/z', {
         method: 'POST',
@@ -1143,7 +1166,7 @@ async function bootManager() {
         { metric: 'Total Cash', value: formatCurrency(result.report.totalCash) },
         { metric: 'Total Sales', value: formatCurrency(result.report.totalSales) },
       ]);
-      setStatus('manager-reports-status', 'Z-report updated and X-totals reset.', 'success');
+      setStatus('manager-reports-status', 'Z-report generated and daily totals reset.', 'success');
       await refreshManagerSummary();
     } catch (error) {
       setStatus('manager-reports-status', error.message, 'error');
@@ -1195,11 +1218,14 @@ async function bootManager() {
 
   document.getElementById('menu-deactivate').addEventListener('click', async () => {
     const data = new FormData(document.getElementById('menu-update-form'));
+    const productId = data.get('productId');
+    if (!productId) { setStatus('manager-menu-status', 'Select a product row first.', 'error'); return; }
+    if (!window.confirm(`Hide product #${productId} from the menu? It can be reactivated later.`)) return;
     await runManagerAction(async () => {
       await fetchJson('/api/menu/deactivate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productId: data.get('productId') }),
+        body: JSON.stringify({ productId }),
       });
       await loadManagerMenuTable();
     }, 'manager-menu-status', 'Product hidden (inactive).');
@@ -1268,8 +1294,11 @@ async function bootManager() {
 
   document.getElementById('inventory-delete').addEventListener('click', async () => {
     const data = new FormData(document.getElementById('inventory-update-form'));
+    const inventoryId = data.get('inventoryId');
+    if (!inventoryId) { setStatus('manager-inventory-status', 'Select an inventory row first.', 'error'); return; }
+    if (!window.confirm(`Permanently delete inventory item #${inventoryId}? This cannot be undone.`)) return;
     await runManagerAction(async () => {
-      await fetchJson(`/api/inventory?inventoryId=${data.get('inventoryId')}`, { method: 'DELETE' });
+      await fetchJson(`/api/inventory?inventoryId=${inventoryId}`, { method: 'DELETE' });
       await loadManagerInventoryTable();
     }, 'manager-inventory-status', 'Inventory item deleted.');
   });
@@ -1323,10 +1352,13 @@ async function bootManager() {
 
   document.getElementById('employees-delete').addEventListener('click', async () => {
     const data = new FormData(document.getElementById('employee-role-form'));
+    const employeeId = data.get('employeeId');
+    if (!employeeId) { setStatus('manager-employees-status', 'Select an employee row first.', 'error'); return; }
+    if (!window.confirm(`Terminate employee #${employeeId}? This will permanently remove them from the system.`)) return;
     await runManagerAction(async () => {
-      await fetchJson(`/api/employees?employeeId=${data.get('employeeId')}`, { method: 'DELETE' });
+      await fetchJson(`/api/employees?employeeId=${employeeId}`, { method: 'DELETE' });
       await loadManagerEmployeesTable();
-    }, 'manager-employees-status', 'Employee terminated.');
+    }, 'manager-employees-status', 'Employee removed from the system.');
   });
 
   document.getElementById('employee-add-form').addEventListener('submit', async (event) => {
