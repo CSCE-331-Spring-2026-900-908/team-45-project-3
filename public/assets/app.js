@@ -1326,6 +1326,8 @@ function saveCustomerProfile(profile) {
       ...profile,
       email: normalizeCustomerEmail(profile.email),
       orderCount: Number(profile.orderCount || 0),
+      customerId: profile.customerId != null ? Number(profile.customerId) : null,
+      freeDrinkCredits: Number(profile.freeDrinkCredits || 0),
     }
     : null;
 }
@@ -1414,8 +1416,7 @@ function getCustomerRewardProgress(profile = customerState.profile) {
 }
 
 function getCustomerRewardDiscount() {
-  const reward = getCustomerRewardProgress();
-  if (!customerState.profile || !customerState.cart.length || !reward.isRewardOrder) {
+  if (!customerState.profile || !customerState.cart.length || customerState.profile.freeDrinkCredits <= 0) {
     return 0;
   }
   const cheapestLine = customerState.cart.reduce((lowest, line) => {
@@ -1497,12 +1498,14 @@ function renderCustomerRewards() {
   const copy = document.getElementById('customer-rewards-copy');
   const meta = document.getElementById('customer-rewards-meta');
   const bar = document.getElementById('customer-rewards-bar');
+  const idLine = document.getElementById('customer-rewards-id');
 
   if (!customerState.profile) {
     heading.textContent = 'No rewards profile yet';
     copy.textContent = 'Sign in or create an account to count orders toward a free drink.';
     meta.textContent = '0 of 5 orders completed';
     bar.style.width = '0%';
+    if (idLine) idLine.textContent = '';
     setFieldValue('customer-name', '');
     setFieldValue('customer-email', '');
     setFieldValue('customer-password', '');
@@ -1510,12 +1513,27 @@ function renderCustomerRewards() {
   }
 
   const reward = getCustomerRewardProgress();
-  heading.textContent = `${customerState.profile.name || customerState.profile.email}`;
-  copy.textContent = reward.isRewardOrder
-    ? 'This order qualifies for one free drink.'
-    : `${reward.ordersUntilReward} more order${reward.ordersUntilReward === 1 ? '' : 's'} until the next free drink.`;
-  meta.textContent = `${reward.progress} of 5 orders completed`;
+  const credits = customerState.profile.freeDrinkCredits || 0;
+
+  heading.textContent = customerState.profile.name || customerState.profile.email;
+
+  if (credits > 0) {
+    copy.textContent = credits === 1
+      ? 'You have 1 free drink credit ready to use on your next order!'
+      : `You have ${credits} free drink credits ready to use!`;
+  } else {
+    copy.textContent = `${reward.ordersUntilReward} more order${reward.ordersUntilReward === 1 ? '' : 's'} until the next free drink.`;
+  }
+
+  meta.textContent = `${reward.progress} of 5 orders completed toward next reward`;
   bar.style.width = `${(reward.progress / 5) * 100}%`;
+
+  if (idLine) {
+    idLine.textContent = customerState.profile.customerId != null
+      ? `Member ID: #${customerState.profile.customerId}`
+      : '';
+  }
+
   setFieldValue('customer-name', customerState.profile.name || '');
   setFieldValue('customer-email', customerState.profile.email || '');
   setFieldValue('customer-password', '');
@@ -1644,9 +1662,10 @@ function renderCustomerCart() {
   setText('customer-total', formatCurrency(Math.max(0, Number(customerState.preview.total || 0) - customerState.rewardDiscount)));
 
   const rewardBanner = document.getElementById('customer-reward-banner');
-  if (customerState.rewardDiscount > 0) {
+  const credits = customerState.profile ? (customerState.profile.freeDrinkCredits || 0) : 0;
+  if (customerState.rewardDiscount > 0 && credits > 0) {
     rewardBanner.hidden = false;
-    rewardBanner.textContent = `Rewards applied: one drink is free on order #${getCustomerRewardProgress().nextOrderNumber}.`;
+    rewardBanner.textContent = `Free drink credit applied! Your cheapest item is on us. (${credits} credit${credits === 1 ? '' : 's'} available)`;
   } else {
     rewardBanner.hidden = true;
     rewardBanner.textContent = '';
@@ -1767,9 +1786,19 @@ async function handleCustomerCheckout() {
     }
   }
 
+  const rewardUsed = customerState.rewardDiscount > 0;
   let rewardsMessage = '';
   if (customerState.profile) {
     try {
+      // If a free drink credit was applied, consume it from the DB first
+      if (rewardUsed) {
+        const redeemUpdate = await fetchJson('/api/customer/rewards/redeem', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        saveCustomerProfile(redeemUpdate.profile);
+      }
+      // Always increment the point counter for logged-in customers
       const rewardsUpdate = await fetchJson('/api/customer/rewards/increment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1781,8 +1810,6 @@ async function handleCustomerCheckout() {
         : ' Order was accepted, but rewards could not be updated.';
     }
   }
-
-  const rewardUsed = customerState.rewardDiscount > 0;
   customerState.cart = [];
   customerState.preview = { ...EMPTY_PREVIEW };
   customerState.rewardDiscount = 0;

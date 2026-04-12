@@ -289,6 +289,21 @@ function createApp() {
     });
   }));
 
+  app.post('/api/customer/rewards/redeem', asyncHandler(async (req, res) => {
+    ensureWritesEnabled();
+    const rewardsEmail = req.session.customerRewardsEmail;
+    if (!rewardsEmail) {
+      const error = new Error('Sign in to a rewards account before redeeming a free drink.');
+      error.statusCode = 401;
+      throw error;
+    }
+
+    res.json({
+      ok: true,
+      profile: await db.redeemFreeDrinkCredit(rewardsEmail),
+    });
+  }));
+
   app.post('/api/reports/z', asyncHandler(async (req, res) => {
     ensureWritesEnabled();
     res.json({

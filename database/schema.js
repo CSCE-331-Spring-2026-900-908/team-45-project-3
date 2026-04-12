@@ -74,10 +74,57 @@ async function ensureRewardsAccountsTable(client = null) {
   await runner.query("ALTER TABLE customer_rewards_accounts ADD COLUMN IF NOT EXISTS name TEXT NOT NULL DEFAULT ''");
 }
 
+/**
+ * Adds a unique auto-incrementing customer_id and a free_drink_credits counter
+ * to the existing customer_rewards_accounts table.
+ * Safe to call multiple times — all operations are idempotent.
+ */
+async function ensureCustomerIdAndCreditsColumns(client = null) {
+  const runner = client || getPool();
+  // Sequence that drives customer IDs
+  await runner.query('CREATE SEQUENCE IF NOT EXISTS customer_rewards_id_seq');
+  // Add the column (no-op if it already exists)
+  await runner.query(
+    'ALTER TABLE customer_rewards_accounts ADD COLUMN IF NOT EXISTS customer_id BIGINT'
+  );
+  // Back-fill any existing rows that predate this migration
+  await runner.query(
+    "UPDATE customer_rewards_accounts SET customer_id = nextval('customer_rewards_id_seq') WHERE customer_id IS NULL"
+  );
+  // Future inserts get an ID automatically
+  await runner.query(
+    "ALTER TABLE customer_rewards_accounts ALTER COLUMN customer_id SET DEFAULT nextval('customer_rewards_id_seq')"
+  );
+  // Free-drink credit balance — 1 credit = 1 free drink
+  await runner.query(
+    'ALTER TABLE customer_rewards_accounts ADD COLUMN IF NOT EXISTS free_drink_credits INT NOT NULL DEFAULT 0'
+  );
+}
+
+/**
+ * Creates the customer_reward_transactions table that records every
+ * point-earning purchase. Each row represents one order that earned points.
+ * Safe to call multiple times.
+ */
+async function ensureRewardTransactionsTable(client = null) {
+  const runner = client || getPool();
+  await runner.query(
+    'CREATE TABLE IF NOT EXISTS customer_reward_transactions (' +
+      'id SERIAL PRIMARY KEY, ' +
+      'customer_email TEXT NOT NULL, ' +
+      'points_earned INT NOT NULL DEFAULT 1, ' +
+      'credit_granted BOOLEAN NOT NULL DEFAULT FALSE, ' +
+      'created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP' +
+    ')'
+  );
+}
+
 module.exports = {
+  ensureCustomerIdAndCreditsColumns,
   ensureOrderPaymentsTable,
   ensureOrderVoidsTable,
   ensureProductActiveColumn,
+  ensureRewardTransactionsTable,
   ensureRewardsAccountsTable,
   ensureReportingTables,
 };
