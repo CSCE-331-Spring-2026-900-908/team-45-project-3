@@ -95,7 +95,7 @@ function createApp() {
   passport.use(new GoogleStrategy({
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: "/auth/google/callback"
+      callbackURL: process.env.GOOGLE_CALLBACK_URL || "/auth/google/callback"
     },
     async (accessToken, refreshToken, profile, done) => {
       const email = profile.emails[0].value;
@@ -447,7 +447,7 @@ function createApp() {
       : '  (Menu is currently unavailable)';
 
     const systemPrompt =
-      'You are a friendly and helpful assistant for Reveille Bubble Tea, a boba tea shop. ' +
+      'You are a friendly and helpful assistant for 12th Man Tea, a boba tea shop. ' +
       'Your job is to help customers with menu information, drink recommendations, and ordering guidance.\n\n' +
       `Current menu:\n${menuText}\n\n` +
       'Drink customization options:\n' +
