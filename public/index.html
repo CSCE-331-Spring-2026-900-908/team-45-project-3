@@ -46,7 +46,7 @@
             </div>
           </div>
           <div id="forecast-container">
-            <p class="muted-line">Loading weather data...</p>
+            <p class="muted-line">Loading weather data...</p> 
           </div>
         </section>
       </main>
@@ -55,31 +55,26 @@
     <script src="/assets/app.js"></script>
     <script>
       const lat = 30.6280;
-      const lon = -96.3344;
+      const lon = -96.3344; //BCS location
 
       async function fetchNWSForecast() {
         const container = document.getElementById('forecast-container');
         try {
-          const pointsRes = await fetch(`https://api.weather.gov/points/${lat},${lon}`);
+          const pointsRes = await fetch(`https://api.weather.gov/points/${lat},${lon}`); //error handling
           if (!pointsRes.ok) throw new Error('Could not reach the weather service.');
-
           const pointsData = await pointsRes.json();
           const forecastRes = await fetch(pointsData.properties.forecast);
           if (!forecastRes.ok) throw new Error('Could not load forecast data.');
-
-          const forecastData = await forecastRes.json();
+          const forecastData = await forecastRes.json(); //jsonify
           const periods = forecastData.properties.periods.slice(0, 7);
-
           container.innerHTML = '';
           const grid = document.createElement('div');
           grid.className = 'forecast-grid';
-
           periods.forEach((period) => {
             let tempClass = 'cool';
             if (period.temperature >= 85) tempClass = 'hot';
             else if (period.temperature >= 70) tempClass = 'warm';
             else if (period.temperature <= 45) tempClass = 'cold';
-
             const card = document.createElement('div');
             card.className = 'forecast-card';
             card.innerHTML = `
@@ -88,13 +83,13 @@
               <p class="temp ${tempClass}">${period.temperature}&deg;${period.temperatureUnit}</p>
               <p class="desc">${period.shortForecast}</p>
             `;
-            grid.appendChild(card);
+            grid.appendChild(card); //adds all the cards to a grid
           });
 
-          container.appendChild(grid);
+          container.appendChild(grid); //actually appends grid to the container
         } catch (error) {
           container.innerHTML = `<p class="status-text" data-tone="error">Unable to load weather: ${error.message}</p>`;
-        }
+        } //proper error handling
       }
 
       fetchNWSForecast();
