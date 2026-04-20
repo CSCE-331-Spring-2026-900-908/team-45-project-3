@@ -687,17 +687,21 @@ body.high-contrast .skip-link:focus-visible {
   outline-offset: 5px;
   box-shadow: 0 0 0 9px #ff2a6d;
   transform: scale(1.03);
-}
+} 
+
 body.high-contrast .ghost-button,
 body.high-contrast .tab-button {
   background: #000;
   color: #fff;
   border-color: #fff;
 }
+
 body.high-contrast .customer-accessibility-label {
   background: #ffd400;
   color: #000;
+
 }
+/* Dark mode for additional contrast */
 body.high-contrast .customer-contrast-toggle,
 body.high-contrast .customer-contrast-toggle[aria-pressed='true'] {
   background: #ffd400;
@@ -727,7 +731,7 @@ body.high-contrast .customer-product-tile:focus-visible {
   transform: scale(1.02);
   position: relative;
   z-index: 2;
-}
+}/* Defined colors for high contrast */
 body.high-contrast .customer-category-boba-tea,
 body.high-contrast .customer-tile-boba-tea {
   background: #ffd400;
@@ -863,6 +867,7 @@ body.high-contrast .code-panel { font-size: 1.1rem; }
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   gap: 14px;
 }
+/* Forecast doesn't have high contrast*/
 .forecast-card {
   padding: 16px 12px;
   border: 1px solid var(--line);
@@ -989,7 +994,7 @@ body.high-contrast .code-panel { font-size: 1.1rem; }
   border: 1px solid var(--line);
   border-bottom-left-radius: 6px;
   font-style: italic;
-}
+} 
 .chat-input-row {
   display: flex;
   gap: 8px;
