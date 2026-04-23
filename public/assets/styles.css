@@ -28,7 +28,20 @@ button, input, select { font: inherit; }
 fieldset { margin: 0; padding: 0; border: 0; }
 [hidden] { display: none !important; }
 
+.check-fieldset {
+  width: 100%;
+  border: 1px solid var(--line);
+  padding: 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.3); /* Subtle background for the box */
+}
 
+.check-fieldset legend {
+  font-weight: 700;
+  color: var(--accent-dark);
+  padding: 0 8px;
+  font-size: 0.9rem;
+}
 
 .page-shell { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 32px 0 48px; }
 .hero, .page-header, .content-card, .info-panel, .role-card, .metric-card { backdrop-filter: blur(10px); }
