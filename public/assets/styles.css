@@ -28,6 +28,8 @@ button, input, select { font: inherit; }
 fieldset { margin: 0; padding: 0; border: 0; }
 [hidden] { display: none !important; }
 
+
+
 .page-shell { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 32px 0 48px; }
 .hero, .page-header, .content-card, .info-panel, .role-card, .metric-card { backdrop-filter: blur(10px); }
 .hero, .page-header {
@@ -118,8 +120,32 @@ h1 { font-size: clamp(2.4rem, 6vw, 4.6rem); line-height: 0.96; max-width: 12ch; 
 }
 .selectable-card.selected { border-color: rgba(181, 93, 61, 0.55); box-shadow: 0 0 0 2px rgba(181, 93, 61, 0.18); }
 .range-line { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; }
-.check-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; color: var(--muted); }
-.check-grid label { display: flex; gap: 8px; align-items: center; }
+.check-grid {
+  display: grid;
+  /* Keeps your 2-column layout */
+  grid-template-columns: repeat(2, 1fr); 
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.check-grid label {
+  display: flex;
+  align-items: center;
+  /* This ensures the text and checkbox are vertically aligned */
+  gap: 10px; 
+  cursor: pointer;
+  /* Optional: keeps the label text from hugging the edges */
+  padding: 4px 0; 
+}
+
+/* Ensure the checkbox itself doesn't have stray margins */
+.check-grid input[type="checkbox"] {
+  margin: 0;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
 .cart-layout { align-items: start; }
 .cart-list { display: grid; gap: 12px; }
 .cart-row { display: flex; justify-content: space-between; gap: 16px; padding: 14px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface-strong); }
