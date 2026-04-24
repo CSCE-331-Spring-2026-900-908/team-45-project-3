@@ -147,9 +147,21 @@ function createApp() {
 
   // --- Legacy / Standard Login API Route ---
   app.post('/api/auth/login', asyncHandler(async (req, res) => {
-    const { username, password, role } = req.body || {};
-    const result = await db.authenticateEmployee(username, password, role);
-    res.status(result.authenticated ? 200 : 401).json({ source: 'database', ...result });
+    const { username, password, pin, role } = req.body || {};
+    let result;
+
+    if (pin) {
+      result = await db.authenticateEmployeeByPin(pin);
+    } else {
+      result = await db.authenticateEmployee(username, password, role);
+    }
+
+    // Double check this line:
+    if (result && result.authenticated === true) { 
+      res.status(200).json(result);
+    } else {
+      res.status(401).json({ authenticated: false, message: "Login failed" });
+    }
   }));
 
   app.get('/api/auth/status', (req, res) => {

@@ -18,7 +18,6 @@ function mapAuthResult(row) {
     username: row.username,
     name: row.name,
     role: row.role,
-    managerUser: row.role === 'manager',
   };
 }
 

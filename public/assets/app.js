@@ -510,42 +510,59 @@ async function bootStaff() {
     await loadStaffProducts();
   }
 
-  // 4. Manual Login Form Handler
+  // 4. Manual Login Form Handler (PIN logic)
   const form = document.getElementById('staff-login-form');
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
-    setStatus('staff-login-status', 'Checking staff credentials...', 'neutral');
+    setStatus('staff-login-status', 'Authenticating PIN...', 'neutral');
     const formData = new FormData(form);
+    const pin = formData.get('pin');
+
+    if (pin.length !== 4) {
+      setStatus('staff-login-status', 'Please enter a 4-digit PIN.', 'error');
+      return;
+    }
+
     try {
       const result = await fetchJson('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: formData.get('username'),
-          password: formData.get('password'),
-          role: 'staff',
-        }),
+        body: JSON.stringify({ pin: pin }) // Fixed variable name
       });
-      saveRoleSession(result);
-      showStaffWorkspace(result);
-      setStatus('staff-login-status', `Signed in as ${result.name || result.username}.`, 'success');
-      await loadStaffProducts();
+
+      if (result.authenticated) {
+        saveRoleSession(result);
+        showStaffWorkspace(result);
+        await loadStaffProducts();
+        setStatus('staff-login-status', `Signed in as ${result.name || 'Staff'}.`, 'success');
+      } else {
+        setStatus('staff-login-status', 'Invalid PIN.', 'error');
+      }
     } catch (error) {
-      setStatus('staff-login-status', error.message, 'error');
+      setStatus('staff-login-status', 'Authentication failed. Please try again.', 'error');
     }
   });
-
   // 5. Sign Out & Navigation
   document.getElementById('staff-sign-out').addEventListener('click', () => {
+    // 1. Clear the session from storage
     clearRoleSession();
+
+    // 2. Reset the internal staff state (Cart, Products, etc.)
     staffState.cart = [];
     staffState.products = [];
     staffState.selectedProductId = null;
     staffState.preview = { ...EMPTY_PREVIEW };
-    document.getElementById('staff-workspace').hidden = true;
-    document.getElementById('staff-login-card').hidden = false;
-    document.querySelector('#staff-login-form [name="username"]').value = '';
-    document.querySelector('#staff-login-form [name="password"]').value = '';
+
+    // 3. Reset the UI elements
+    document.getElementById('staff-workspace').hidden = true; // Hide the dashboard
+    document.getElementById('staff-login-card').hidden = false; // Show the PIN entry
+    
+    // Clear the PIN input field specifically
+    const pinInput = document.querySelector('#staff-login-form [name="pin"]');
+    if (pinInput) {
+      pinInput.value = '';
+    }
+
     setStatus('staff-login-status', 'Signed out successfully.', 'neutral');
   });
 

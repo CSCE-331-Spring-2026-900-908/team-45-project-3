@@ -1158,3 +1158,9 @@ body.high-contrast .chat-input {
   color: #f8f8f8;
   border-color: rgba(255, 255, 255, 0.44);
 }
+#staff-login-form input[name="pin"] {
+  text-align: center;
+  font-size: 2rem;
+  letter-spacing: 0.5em;
+  padding: 16px;
+}

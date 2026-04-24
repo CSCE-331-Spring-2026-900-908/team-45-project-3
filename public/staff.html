@@ -18,14 +18,21 @@
           <h2>Authenticate for cashier access</h2>
           <form id="staff-login-form" class="auth-form">
             <label>
-              <span>Username</span>
-              <input name="username" type="text" autocomplete="username" required />
+              <span>Employee PIN</span>
+              <input 
+                name="pin" 
+                type="password" 
+                inputmode="numeric" 
+                pattern="[0-9]*" 
+                maxlength="4" 
+                placeholder="••••" 
+                required 
+              />
             </label>
-            <label>
-              <span>Password</span>
-              <input name="password" type="password" autocomplete="current-password" required />
-            </label>
-            <button class="action-button" type="submit">Sign In</button>
+            <button class="action-button" type="submit">Unlock Interface</button>
+            <div style="text-align: center; margin-top: 1rem;">
+              <a href="/" class="muted-line">Return to Portal</a>
+            </div>
           </form>
 
           <p id="staff-login-status" class="status-text" data-tone="neutral">
