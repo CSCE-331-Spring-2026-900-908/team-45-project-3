@@ -30,6 +30,23 @@
             Enable High Contrast
           </button>
           <label class="customer-lang-label">
+            <span data-i18n="Text Size">Text Size</span>
+            <select id="customer-text-size" class="customer-lang-select" aria-label="Select text size">
+              <option value="1">Default</option>
+              <option value="1.1">Large</option>
+              <option value="1.2">Extra Large</option>
+              <option value="1.35">Maximum</option>
+            </select>
+          </label>
+          <div class="customer-zoom-controls" aria-label="Magnification controls">
+            <span class="customer-lang-label" data-i18n="Magnification">Magnification</span>
+            <div class="button-row customer-zoom-actions">
+              <button id="customer-zoom-decrease" class="ghost-button mini-button" type="button" aria-label="Decrease magnification">-</button>
+              <span id="customer-zoom-readout" class="customer-zoom-readout">100%</span>
+              <button id="customer-zoom-increase" class="ghost-button mini-button" type="button" aria-label="Increase magnification">+</button>
+            </div>
+          </div>
+          <label class="customer-lang-label">
             <span data-i18n="Language">Language</span>
             <select id="customer-lang-select" class="customer-lang-select" aria-label="Select display language">
               <option value="en">English</option>

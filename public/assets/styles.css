@@ -9,6 +9,8 @@
   --accent-dark: #86412b;
   --accent-soft: #f0c7a2;
   --shadow: 0 18px 50px rgba(60, 31, 12, 0.12);
+  --customer-text-scale: 1;
+  --customer-zoom-scale: 1;
 }
 
 * { box-sizing: border-box; }
@@ -396,6 +398,9 @@ h1 { font-size: clamp(2.4rem, 6vw, 4.6rem); line-height: 0.96; max-width: 12ch; 
 .customer-page {
   display: grid;
   gap: 20px;
+  font-size: calc(1rem * var(--customer-text-scale));
+  transform: scale(var(--customer-zoom-scale));
+  transform-origin: top center;
 }
 .customer-hero {
   display: grid;
@@ -450,6 +455,20 @@ h1 { font-size: clamp(2.4rem, 6vw, 4.6rem); line-height: 0.96; max-width: 12ch; 
   border-color: #2c241f;
   color: #fff7e8;
   box-shadow: 0 12px 26px rgba(44, 36, 31, 0.24);
+}
+.customer-zoom-controls {
+  display: grid;
+  gap: 8px;
+}
+.customer-zoom-actions {
+  align-items: center;
+  margin-top: 0;
+}
+.customer-zoom-readout {
+  min-width: 64px;
+  text-align: center;
+  font-weight: 700;
+  color: var(--accent-dark);
 }
 .compact-auth-form {
   margin-top: 0;

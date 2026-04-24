@@ -16,6 +16,8 @@ const managerState = {
   selectedInventoryId: null,
 };
 const CUSTOMER_CONTRAST_KEY = 'customerHighContrast';
+const CUSTOMER_TEXT_SIZE_KEY = 'customerTextScale';
+const CUSTOMER_ZOOM_KEY = 'customerZoomScale';
 const CUSTOMER_PHONE_DIGIT_PATTERN = /\d/g;
 const CUSTOMER_PHONE_NUMBER_LENGTH = 10;
 const CUSTOMER_CATEGORY_ORDER = ['boba-tea', 'milk-tea', 'tea', 'seasonal'];
@@ -46,6 +48,8 @@ const customerState = {
   profile: null,
   selectedProductId: null,
   highContrast: false,
+  textScale: 1,
+  zoomScale: 1,
   lastDialogTrigger: null,
   isSubmittingOrder: false,
 };
@@ -1627,6 +1631,16 @@ function loadCustomerContrastPreference() {
   return localStorage.getItem(CUSTOMER_CONTRAST_KEY) === 'true';
 }
 
+function loadCustomerTextScalePreference() {
+  const value = Number(localStorage.getItem(CUSTOMER_TEXT_SIZE_KEY) || 1);
+  return [1, 1.1, 1.2, 1.35].includes(value) ? value : 1;
+}
+
+function loadCustomerZoomPreference() {
+  const value = Number(localStorage.getItem(CUSTOMER_ZOOM_KEY) || 1);
+  return Math.min(1.4, Math.max(0.9, Number.isFinite(value) ? value : 1));
+}
+
 function setCustomerContrastPreference(enabled) {
   customerState.highContrast = enabled;
   document.body.classList.toggle('high-contrast', enabled);
@@ -1636,6 +1650,24 @@ function setCustomerContrastPreference(enabled) {
     button.setAttribute('aria-pressed', enabled ? 'true' : 'false');
     button.textContent = enabled ? 'Use Standard Contrast' : 'Enable High Contrast';
   }
+}
+
+function setCustomerTextScale(scale) {
+  customerState.textScale = scale;
+  document.documentElement.style.setProperty('--customer-text-scale', String(scale));
+  localStorage.setItem(CUSTOMER_TEXT_SIZE_KEY, String(scale));
+  const select = document.getElementById('customer-text-size');
+  if (select) {
+    select.value = String(scale);
+  }
+}
+
+function setCustomerZoomScale(scale) {
+  const normalized = Math.min(1.4, Math.max(0.9, Number(scale) || 1));
+  customerState.zoomScale = normalized;
+  document.documentElement.style.setProperty('--customer-zoom-scale', String(normalized));
+  localStorage.setItem(CUSTOMER_ZOOM_KEY, String(normalized));
+  setText('customer-zoom-readout', `${Math.round(normalized * 100)}%`);
 }
 
 function normalizeCustomerCategory(product) {
@@ -2111,6 +2143,15 @@ function attachCustomerEventHandlers() {
   document.getElementById('customer-contrast-toggle').addEventListener('click', () => {
     setCustomerContrastPreference(!customerState.highContrast);
   });
+  document.getElementById('customer-text-size')?.addEventListener('change', (event) => {
+    setCustomerTextScale(Number(event.target.value) || 1);
+  });
+  document.getElementById('customer-zoom-decrease')?.addEventListener('click', () => {
+    setCustomerZoomScale(Number((customerState.zoomScale - 0.1).toFixed(2)));
+  });
+  document.getElementById('customer-zoom-increase')?.addEventListener('click', () => {
+    setCustomerZoomScale(Number((customerState.zoomScale + 0.1).toFixed(2)));
+  });
   document.getElementById('customer-qty-decrement').addEventListener('click', () => {
     adjustCustomerQuantity(-1);
   });
@@ -2227,7 +2268,11 @@ function attachCustomerEventHandlers() {
 
 async function bootCustomer() {
   customerState.highContrast = loadCustomerContrastPreference();
+  customerState.textScale = loadCustomerTextScalePreference();
+  customerState.zoomScale = loadCustomerZoomPreference();
   setCustomerContrastPreference(customerState.highContrast);
+  setCustomerTextScale(customerState.textScale);
+  setCustomerZoomScale(customerState.zoomScale);
   await loadCustomerRewardsSession();
   renderCustomerRewards();
   renderCustomerCart();
