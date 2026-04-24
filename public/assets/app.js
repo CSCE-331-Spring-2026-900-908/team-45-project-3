@@ -633,8 +633,16 @@ function renderTable(containerId, columns, rows, options = {}) {
     return;
   }
 
+  container.innerHTML = '';
+  if (options.beforeTable instanceof HTMLElement) {
+    container.appendChild(options.beforeTable);
+  }
+
   if (!rows.length) {
-    container.innerHTML = '<p class="muted-line">No data found.</p>';
+    const empty = document.createElement('p');
+    empty.className = 'muted-line';
+    empty.textContent = 'No data found.';
+    container.appendChild(empty);
     return;
   }
 
@@ -662,15 +670,18 @@ function renderTable(containerId, columns, rows, options = {}) {
     }
     columns.forEach((column) => {
       const td = document.createElement('td');
-      const value = row[column.key];
-      td.textContent = value === undefined || value === null ? '' : String(value);
+      const value = typeof column.render === 'function' ? column.render(row) : row[column.key];
+      if (value instanceof HTMLElement) {
+        td.appendChild(value);
+      } else {
+        td.textContent = value === undefined || value === null ? '' : String(value);
+      }
       tr.appendChild(td);
     });
     tbody.appendChild(tr);
   });
   table.appendChild(tbody);
 
-  container.innerHTML = '';
   container.appendChild(table);
 }
 
@@ -1007,11 +1018,116 @@ async function runReportTotalRevenue() {
 
 async function runReportLowInventory() {
   const data = await fetchJson('/api/inventory/low');
+  const estimateRestockCost = (item, targetQuantity) => {
+    const currentQuantity = Math.max(0, Number(item.quantity) || 0);
+    const desiredQuantity = Math.max(0, Number(targetQuantity) || 0);
+    const unitsToBuy = Math.max(0, desiredQuantity - currentQuantity);
+    return Number((unitsToBuy * Number(item.price || 0)).toFixed(2));
+  };
+  const bulkControls = document.createElement('div');
+  bulkControls.className = 'button-row';
+
+  const bulkInput = document.createElement('input');
+  bulkInput.type = 'number';
+  bulkInput.min = '0';
+  bulkInput.value = '100';
+  bulkInput.className = 'numeric-input';
+  bulkInput.style.maxWidth = '140px';
+
+  const bulkCost = document.createElement('span');
+  bulkCost.className = 'muted-line';
+
+  const updateBulkCost = () => {
+    const nextQuantity = Math.max(0, Number(bulkInput.value) || 0);
+    const totalCost = (data.items || []).reduce((sum, item) => sum + estimateRestockCost(item, nextQuantity), 0);
+    bulkCost.textContent = `Estimated total cost: ${formatCurrency(totalCost)}`;
+  };
+  bulkInput.addEventListener('input', updateBulkCost);
+
+  const bulkButton = document.createElement('button');
+  bulkButton.type = 'button';
+  bulkButton.className = 'action-button mini-button';
+  bulkButton.textContent = 'Restock All To';
+  bulkButton.addEventListener('click', async () => {
+    const nextQuantity = Math.max(0, Number(bulkInput.value) || 0);
+    await runManagerAction(async () => {
+      for (const item of data.items || []) {
+        await fetchJson('/api/inventory/quantity', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ inventoryId: item.id, quantity: nextQuantity }),
+        });
+      }
+      await loadManagerInventoryTable();
+      await runReportLowInventory();
+    }, 'manager-reports-status', `All low inventory items were restocked to ${nextQuantity}.`);
+  });
+
+  bulkControls.appendChild(bulkInput);
+  bulkControls.appendChild(bulkButton);
+  bulkControls.appendChild(bulkCost);
+  updateBulkCost();
+
   renderTable('manager-report-table', [
     { key: 'id', label: 'ID' },
     { key: 'name', label: 'Name' },
     { key: 'quantity', label: 'Quantity' },
-  ], data.items || []);
+    {
+      key: 'price',
+      label: 'Unit Price',
+      render: (item) => formatCurrency(item.price),
+    },
+    {
+      key: 'restock',
+      label: 'Restock To',
+      render: (item) => {
+        const wrap = document.createElement('div');
+        wrap.className = 'button-row';
+
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.min = '0';
+        input.value = '100';
+        input.className = 'numeric-input';
+        input.style.maxWidth = '110px';
+
+        const cost = document.createElement('span');
+        cost.className = 'muted-line';
+        const updateCost = () => {
+          cost.textContent = formatCurrency(estimateRestockCost(item, input.value));
+        };
+        input.addEventListener('input', updateCost);
+        updateCost();
+
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'ghost-button mini-button';
+        button.textContent = 'Restock';
+        button.addEventListener('click', async (event) => {
+          event.stopPropagation();
+          const nextQuantity = Math.max(0, Number(input.value) || 0);
+          await runManagerAction(async () => {
+            await fetchJson('/api/inventory/quantity', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ inventoryId: item.id, quantity: nextQuantity }),
+            });
+            await loadManagerInventoryTable();
+            await runReportLowInventory();
+          }, 'manager-reports-status', `Inventory item #${item.id} restocked to ${nextQuantity}.`);
+          const refreshedItem = managerState.inventoryItems.find((entry) => Number(entry.id) === Number(item.id));
+          if (refreshedItem) {
+            applyInventorySelection({ ...refreshedItem, rawPrice: refreshedItem.price });
+          }
+        });
+
+        wrap.appendChild(input);
+        wrap.appendChild(cost);
+        wrap.appendChild(button);
+        return wrap;
+      },
+    },
+  ], data.items || [], { beforeTable: bulkControls });
   setStatus('manager-reports-status', 'Loaded low inventory report.', 'success');
 }
 
