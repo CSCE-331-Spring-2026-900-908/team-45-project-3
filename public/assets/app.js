@@ -7,6 +7,7 @@ const staffState = {
   cart: [],
   selectedProductId: null,
   preview: { ...EMPTY_PREVIEW },
+  isSubmittingOrder: false,
 };
 const managerState = {
   menuItems: [],
@@ -15,7 +16,8 @@ const managerState = {
   selectedInventoryId: null,
 };
 const CUSTOMER_CONTRAST_KEY = 'customerHighContrast';
-const CUSTOMER_EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const CUSTOMER_PHONE_DIGIT_PATTERN = /\d/g;
+const CUSTOMER_PHONE_NUMBER_LENGTH = 10;
 const CUSTOMER_CATEGORY_ORDER = ['boba-tea', 'milk-tea', 'tea', 'seasonal'];
 const CUSTOMER_CATEGORY_META = {
   'boba-tea': {
@@ -45,6 +47,7 @@ const customerState = {
   selectedProductId: null,
   highContrast: false,
   lastDialogTrigger: null,
+  isSubmittingOrder: false,
 };
 // ── Translation ───────────────────────────────────────────────────────────────
 const SUPPORTED_LANGUAGES = [
@@ -559,7 +562,12 @@ async function bootStaff() {
 
   document.getElementById('staff-preview-order').addEventListener('click', refreshPreview);
   document.getElementById('staff-submit-order').addEventListener('click', async () => {
-    if (!staffState.cart.length) return;
+    if (!staffState.cart.length || staffState.isSubmittingOrder) return;
+    staffState.isSubmittingOrder = true;
+    const submitButton = document.getElementById('staff-submit-order');
+    if (submitButton) {
+      submitButton.disabled = true;
+    }
     try {
       await fetchJson('/api/orders', {
         method: 'POST',
@@ -573,6 +581,11 @@ async function bootStaff() {
       setStatus('staff-preview-status', 'Order submitted successfully.', 'success');
     } catch (error) {
       setStatus('staff-preview-status', error.message, 'error');
+    } finally {
+      staffState.isSubmittingOrder = false;
+      if (submitButton) {
+        submitButton.disabled = false;
+      }
     }
   });
 }
@@ -1422,15 +1435,24 @@ async function loadManagerWorkspace() {
   setStatus('manager-dashboard-status', 'Manager workspace synced with the live database.', 'success');
 }
 
-function normalizeCustomerEmail(email) {
-  return String(email || '').trim().toLowerCase();
+function normalizeCustomerPhoneNumber(phoneNumber) {
+  return (String(phoneNumber || '').match(CUSTOMER_PHONE_DIGIT_PATTERN) || [])
+    .join('')
+    .slice(0, CUSTOMER_PHONE_NUMBER_LENGTH);
+}
+
+function formatCustomerPhoneNumber(phoneNumber) {
+  const digits = normalizeCustomerPhoneNumber(phoneNumber);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
 }
 
 function saveCustomerProfile(profile) {
   customerState.profile = profile
     ? {
       ...profile,
-      email: normalizeCustomerEmail(profile.email),
+      phoneNumber: normalizeCustomerPhoneNumber(profile.phoneNumber),
       orderCount: Number(profile.orderCount || 0),
       customerId: profile.customerId != null ? Number(profile.customerId) : null,
       freeDrinkCredits: Number(profile.freeDrinkCredits || 0),
@@ -1445,24 +1467,13 @@ function clearCustomerProfile() {
 function readCustomerRewardsCredentials() {
   const formData = new FormData(document.getElementById('customer-login-form'));
   return {
-    name: String(formData.get('name') || '').trim(),
-    email: normalizeCustomerEmail(formData.get('email')),
-    password: String(formData.get('password') || ''),
+    phoneNumber: normalizeCustomerPhoneNumber(formData.get('phoneNumber')),
   };
 }
 
-function validateCustomerRewardsCredentials(credentials, requireName = false) {
-  if (!CUSTOMER_EMAIL_PATTERN.test(credentials.email)) {
-    throw new Error('Enter a valid email address.');
-  }
-  if (!credentials.password) {
-    throw new Error('Enter your password.');
-  }
-  if (credentials.password.length < 8) {
-    throw new Error('Password must be at least 8 characters.');
-  }
-  if (requireName && !credentials.name) {
-    throw new Error('Enter a name for the rewards account.');
+function validateCustomerRewardsCredentials(credentials) {
+  if (normalizeCustomerPhoneNumber(credentials.phoneNumber).length !== CUSTOMER_PHONE_NUMBER_LENGTH) {
+    throw new Error('Enter a 10-digit phone number.');
   }
 }
 
@@ -1612,16 +1623,14 @@ function renderCustomerRewards() {
     meta.textContent = '0 of 5 orders completed';
     bar.style.width = '0%';
     if (idLine) idLine.textContent = '';
-    setFieldValue('customer-name', '');
-    setFieldValue('customer-email', '');
-    setFieldValue('customer-password', '');
+    setFieldValue('customer-phone', '');
     return;
   }
 
   const reward = getCustomerRewardProgress();
   const credits = customerState.profile.freeDrinkCredits || 0;
 
-  heading.textContent = customerState.profile.name || customerState.profile.email;
+  heading.textContent = formatCustomerPhoneNumber(customerState.profile.phoneNumber);
 
   if (credits > 0) {
     copy.textContent = credits === 1
@@ -1640,9 +1649,7 @@ function renderCustomerRewards() {
       : '';
   }
 
-  setFieldValue('customer-name', customerState.profile.name || '');
-  setFieldValue('customer-email', customerState.profile.email || '');
-  setFieldValue('customer-password', '');
+  setFieldValue('customer-phone', formatCustomerPhoneNumber(customerState.profile.phoneNumber || ''));
 }
 
 function activateCustomerCategory(categoryKey, focusButton = false) {
@@ -1868,64 +1875,80 @@ async function handleCustomerCheckout() {
     setStatus('customer-cart-status', 'Add at least one drink before placing an order.', 'error');
     return;
   }
-
-  setStatus('customer-cart-status', 'Submitting your order...', 'neutral');
-  try {
-    await fetchJson('/api/orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        items: customerState.cart.map(toOrderPayload),
-        payment: {
-          primaryPaymentType: 'Credit Card',
-          secondaryPaymentType: null,
-          giftAmount: customerState.rewardDiscount,
-          cashReceived: 0,
-          cashChange: 0,
-          totalAmount: Math.max(0, Number(customerState.preview.total || 0) - customerState.rewardDiscount),
-        },
-      }),
-    });
-  } catch (error) {
-    if (!String(error.message || '').includes('disabled')) {
-      throw error;
-    }
+  if (customerState.isSubmittingOrder) {
+    setStatus('customer-cart-status', 'Your order is already being submitted.', 'neutral');
+    return;
   }
 
-  const rewardUsed = customerState.rewardDiscount > 0;
-  let rewardsMessage = '';
-  if (customerState.profile) {
+  customerState.isSubmittingOrder = true;
+  const checkoutButton = document.getElementById('customer-checkout');
+  if (checkoutButton) {
+    checkoutButton.disabled = true;
+  }
+  setStatus('customer-cart-status', 'Submitting your order...', 'neutral');
+  try {
     try {
-      // If a free drink credit was applied, consume it from the DB first
-      if (rewardUsed) {
-        const redeemUpdate = await fetchJson('/api/customer/rewards/redeem', {
+      await fetchJson('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: customerState.cart.map(toOrderPayload),
+          payment: {
+            primaryPaymentType: 'Credit Card',
+            secondaryPaymentType: null,
+            giftAmount: customerState.rewardDiscount,
+            cashReceived: 0,
+            cashChange: 0,
+            totalAmount: Math.max(0, Number(customerState.preview.total || 0) - customerState.rewardDiscount),
+          },
+        }),
+      });
+    } catch (error) {
+      if (!String(error.message || '').includes('disabled')) {
+        throw error;
+      }
+    }
+
+    const rewardUsed = customerState.rewardDiscount > 0;
+    let rewardsMessage = '';
+    if (customerState.profile) {
+      try {
+        if (rewardUsed) {
+          const redeemUpdate = await fetchJson('/api/customer/rewards/redeem', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+          });
+          saveCustomerProfile(redeemUpdate.profile);
+        }
+        const rewardsUpdate = await fetchJson('/api/customer/rewards/increment', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
         });
-        saveCustomerProfile(redeemUpdate.profile);
+        saveCustomerProfile(rewardsUpdate.profile);
+      } catch (error) {
+        rewardsMessage = String(error.message || '').includes('disabled')
+          ? ' Order was accepted, but rewards could not update while database writes are disabled.'
+          : ' Order was accepted, but rewards could not be updated.';
       }
-      // Always increment the point counter for logged-in customers
-      const rewardsUpdate = await fetchJson('/api/customer/rewards/increment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      saveCustomerProfile(rewardsUpdate.profile);
-    } catch (error) {
-      rewardsMessage = String(error.message || '').includes('disabled')
-        ? ' Order was accepted, but rewards could not update while database writes are disabled.'
-        : ' Order was accepted, but rewards could not be updated.';
+    }
+    customerState.cart = [];
+    customerState.preview = { ...EMPTY_PREVIEW };
+    customerState.rewardDiscount = 0;
+    renderCustomerRewards();
+    renderCustomerCart();
+    setStatus(
+      'customer-cart-status',
+      (rewardUsed ? 'Order placed. Your free drink reward was applied.' : 'Order placed. Rewards progress has been updated.') + rewardsMessage,
+      'success'
+    );
+  } catch (error) {
+    setStatus('customer-cart-status', error.message || 'Unable to submit your order.', 'error');
+  } finally {
+    customerState.isSubmittingOrder = false;
+    if (checkoutButton) {
+      checkoutButton.disabled = false;
     }
   }
-  customerState.cart = [];
-  customerState.preview = { ...EMPTY_PREVIEW };
-  customerState.rewardDiscount = 0;
-  renderCustomerRewards();
-  renderCustomerCart();
-  setStatus(
-    'customer-cart-status',
-    (rewardUsed ? 'Order placed. Your free drink reward was applied.' : 'Order placed. Rewards progress has been updated.') + rewardsMessage,
-    'success'
-  );
 }
 
 function attachCustomerEventHandlers() {
@@ -1941,6 +1964,9 @@ function attachCustomerEventHandlers() {
   document.getElementById('customer-qty').addEventListener('input', (event) => {
     setCustomerQuantity(event.target.value);
   });
+  document.getElementById('customer-phone')?.addEventListener('input', (event) => {
+    event.target.value = formatCustomerPhoneNumber(event.target.value);
+  });
 
   document.getElementById('customer-login-form').addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -1950,10 +1976,7 @@ function attachCustomerEventHandlers() {
       const result = await fetchJson('/api/customer/rewards/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: credentials.email,
-          password: credentials.password,
-        }),
+        body: JSON.stringify(credentials),
       });
       saveCustomerProfile(result.profile);
       renderCustomerRewards();
@@ -1968,7 +1991,7 @@ function attachCustomerEventHandlers() {
   document.getElementById('customer-register').addEventListener('click', async () => {
     try {
       const credentials = readCustomerRewardsCredentials();
-      validateCustomerRewardsCredentials(credentials, true);
+      validateCustomerRewardsCredentials(credentials);
       const result = await fetchJson('/api/customer/rewards/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

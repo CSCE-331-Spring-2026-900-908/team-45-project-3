@@ -50,8 +50,8 @@
               <div>
                 <p class="section-label" data-i18n="Rewards Login">Rewards Login</p>
                 <h2 id="customer-menu-heading" data-i18n="Welcome to the menu">Welcome to the menu</h2>
-                <p class="muted-line" data-i18n="Sign in with your name and email to track the free-drink reward on every 5th order.">
-                  Sign in with your name and email to track the free-drink reward on every 5th order.
+                <p class="muted-line" data-i18n="Sign in with your phone number to track the free-drink reward on every 5th order.">
+                  Sign in with your phone number to track the free-drink reward on every 5th order.
                 </p>
               </div>
             </div>
@@ -59,16 +59,17 @@
             <div class="customer-account-grid">
               <form id="customer-login-form" class="auth-form compact-auth-form" autocomplete="on">
                 <label>
-                  <span data-i18n="Name for rewards account">Name for rewards account</span>
-                  <input id="customer-name" name="name" type="text" autocomplete="name" />
-                </label>
-                <label>
-                  <span data-i18n="Email">Email</span>
-                  <input id="customer-email" name="email" type="email" autocomplete="email" required />
-                </label>
-                <label>
-                  <span data-i18n="Password">Password</span>
-                  <input id="customer-password" name="password" type="password" autocomplete="current-password" minlength="8" required />
+                  <span data-i18n="Rewards phone number">Rewards phone number</span>
+                  <input
+                    id="customer-phone"
+                    name="phoneNumber"
+                    type="tel"
+                    inputmode="numeric"
+                    autocomplete="tel"
+                    maxlength="14"
+                    placeholder="(555) 123-4567"
+                    required
+                  />
                 </label>
                 <div class="button-row customer-login-actions">
                   <button id="customer-login" class="action-button" type="submit" data-i18n="Sign In">Sign In</button>

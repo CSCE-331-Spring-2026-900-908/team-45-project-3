@@ -62,16 +62,40 @@ async function ensureReportingTables(client = null) {
 
 async function ensureRewardsAccountsTable(client = null) {
   const runner = client || getPool();
+  await runner.query('CREATE SEQUENCE IF NOT EXISTS customer_rewards_id_seq');
   await runner.query(
     'CREATE TABLE IF NOT EXISTS customer_rewards_accounts (' +
-      'email TEXT PRIMARY KEY, ' +
-      'password_hash TEXT NOT NULL, ' +
+      'phone_number TEXT PRIMARY KEY, ' +
       'reward_counter INT NOT NULL DEFAULT 0, ' +
-      "name TEXT NOT NULL DEFAULT '', " +
       'created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP' +
     ')'
   );
-  await runner.query("ALTER TABLE customer_rewards_accounts ADD COLUMN IF NOT EXISTS name TEXT NOT NULL DEFAULT ''");
+  const { rows } = await runner.query(
+    "SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'customer_rewards_accounts'"
+  );
+  const columns = new Set(rows.map((row) => row.column_name));
+
+  if (columns.has('email') && !columns.has('phone_number')) {
+    await runner.query('ALTER TABLE customer_rewards_accounts RENAME COLUMN email TO phone_number');
+    columns.delete('email');
+    columns.add('phone_number');
+  }
+
+  if (!columns.has('phone_number')) {
+    await runner.query("ALTER TABLE customer_rewards_accounts ADD COLUMN phone_number TEXT");
+    await runner.query("UPDATE customer_rewards_accounts SET phone_number = customer_id::text WHERE phone_number IS NULL AND customer_id IS NOT NULL");
+    await runner.query("UPDATE customer_rewards_accounts SET phone_number = CONCAT('legacy-', nextval('customer_rewards_id_seq')) WHERE phone_number IS NULL");
+  }
+
+  await runner.query('ALTER TABLE customer_rewards_accounts DROP CONSTRAINT IF EXISTS customer_rewards_accounts_pkey');
+  await runner.query('ALTER TABLE customer_rewards_accounts ADD PRIMARY KEY (phone_number)');
+
+  if (columns.has('password_hash')) {
+    await runner.query('ALTER TABLE customer_rewards_accounts DROP COLUMN password_hash');
+  }
+  if (columns.has('name')) {
+    await runner.query('ALTER TABLE customer_rewards_accounts DROP COLUMN name');
+  }
 }
 
 /**
@@ -111,12 +135,19 @@ async function ensureRewardTransactionsTable(client = null) {
   await runner.query(
     'CREATE TABLE IF NOT EXISTS customer_reward_transactions (' +
       'id SERIAL PRIMARY KEY, ' +
-      'customer_email TEXT NOT NULL, ' +
+      'customer_phone_number TEXT NOT NULL, ' +
       'points_earned INT NOT NULL DEFAULT 1, ' +
       'credit_granted BOOLEAN NOT NULL DEFAULT FALSE, ' +
       'created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP' +
     ')'
   );
+  const { rows } = await runner.query(
+    "SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'customer_reward_transactions'"
+  );
+  const columns = new Set(rows.map((row) => row.column_name));
+  if (columns.has('customer_email') && !columns.has('customer_phone_number')) {
+    await runner.query('ALTER TABLE customer_reward_transactions RENAME COLUMN customer_email TO customer_phone_number');
+  }
 }
 
 module.exports = {
