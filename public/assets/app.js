@@ -1670,6 +1670,16 @@ function setCustomerZoomScale(scale) {
   setText('customer-zoom-readout', `${Math.round(normalized * 100)}%`);
 }
 
+function setCustomerAccessibilityPanelOpen(isOpen) {
+  const panel = document.querySelector('.customer-accessibility-tools');
+  const toggle = document.getElementById('customer-accessibility-toggle');
+  if (!panel || !toggle) {
+    return;
+  }
+  panel.hidden = !isOpen;
+  toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+}
+
 function normalizeCustomerCategory(product) {
   const source = `${product.category || ''} ${product.name || ''}`.toLowerCase();
   if (source.includes('season') || source.includes('limited') || source.includes('holiday') || source.includes('special')) {
@@ -2140,6 +2150,22 @@ async function handleCustomerCheckout() {
 }
 
 function attachCustomerEventHandlers() {
+  document.getElementById('customer-accessibility-toggle')?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const panel = document.querySelector('.customer-accessibility-tools');
+    setCustomerAccessibilityPanelOpen(Boolean(panel?.hidden));
+  });
+  document.querySelector('.customer-accessibility-tools')?.addEventListener('click', (event) => {
+    event.stopPropagation();
+  });
+  document.addEventListener('click', () => {
+    setCustomerAccessibilityPanelOpen(false);
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      setCustomerAccessibilityPanelOpen(false);
+    }
+  });
   document.getElementById('customer-contrast-toggle').addEventListener('click', () => {
     setCustomerContrastPreference(!customerState.highContrast);
   });
@@ -2267,6 +2293,15 @@ function attachCustomerEventHandlers() {
 }
 
 async function bootCustomer() {
+  const accessibilityPanel = document.querySelector('.customer-accessibility-tools');
+  const accessibilityToggle = document.getElementById('customer-accessibility-toggle');
+  if (accessibilityPanel && accessibilityToggle) {
+    if (accessibilityPanel.parentElement !== document.body) {
+      document.body.insertBefore(accessibilityPanel, accessibilityToggle);
+    }
+    accessibilityPanel.id = 'customer-accessibility-panel';
+    accessibilityPanel.hidden = true;
+  }
   customerState.highContrast = loadCustomerContrastPreference();
   customerState.textScale = loadCustomerTextScalePreference();
   customerState.zoomScale = loadCustomerZoomPreference();
