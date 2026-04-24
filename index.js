@@ -207,7 +207,17 @@ function createApp() {
 
   // --- Read-only API routes ---
   app.get('/api/products', asyncHandler(async (_, res) => {
-    res.json({ source: 'database', items: await db.fetchProducts() });
+    const [items, availability] = await Promise.all([
+      db.fetchProducts(),
+      db.fetchProductAvailability(),
+    ]);
+    res.json({
+      source: 'database',
+      items: items.map((item) => ({
+        ...item,
+        outOfStock: availability.get(item.id) === false,
+      })),
+    });
   }));
 
   app.get('/api/categories', asyncHandler(async (_, res) => {

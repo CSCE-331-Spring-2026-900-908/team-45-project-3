@@ -311,6 +311,10 @@ function customizationSummary(item) {
   return `${item.size}, ${item.sugarPercent}% sugar${toppings}`;
 }
 
+function getFirstAvailableProduct(products) {
+  return (products || []).find((item) => !item.outOfStock) || null;
+}
+
 function renderStaffProducts() {
   const container = document.getElementById('staff-products');
   const category = document.getElementById('staff-category-filter').value;
@@ -318,21 +322,36 @@ function renderStaffProducts() {
     ? staffState.products
     : staffState.products.filter((item) => item.category === category);
 
+  const selectedVisibleProduct = visible.find((item) => Number(item.id) === Number(staffState.selectedProductId) && !item.outOfStock);
+  if (!selectedVisibleProduct) {
+    const fallbackProduct = getFirstAvailableProduct(visible);
+    staffState.selectedProductId = fallbackProduct ? fallbackProduct.id : null;
+    setText('staff-selected-product', fallbackProduct ? fallbackProduct.name : 'No in-stock product selected');
+    setText('staff-selected-price', fallbackProduct ? `Base price ${formatCurrency(fallbackProduct.price)} before size adjustment.` : 'Products marked out of stock cannot be customized.');
+  }
+
   container.innerHTML = '';
   visible.forEach((item) => {
     const card = document.createElement('article');
-    card.className = `product-card selectable-card${staffState.selectedProductId === item.id ? ' selected' : ''}`;
-    card.tabIndex = 0;
+    const isDisabled = Boolean(item.outOfStock);
+    card.className = `product-card selectable-card${staffState.selectedProductId === item.id ? ' selected' : ''}${isDisabled ? ' product-card-disabled' : ''}`;
+    card.tabIndex = isDisabled ? -1 : 0;
     card.setAttribute('role', 'button');
     card.setAttribute('aria-pressed', staffState.selectedProductId === item.id ? 'true' : 'false');
+    card.setAttribute('aria-disabled', isDisabled ? 'true' : 'false');
     card.innerHTML = `
       <p class="section-label">${escapeHtml(item.category)}</p>
       <h3>${escapeHtml(item.name)}</h3>
       <p class="price-line">$${Number(item.price).toFixed(2)}</p>
-      <p class="muted-line">Click anywhere on this card to customize.</p>
+      <p class="muted-line">${isDisabled ? 'Out of stock.' : 'Click anywhere on this card to customize.'}</p>
+      ${isDisabled ? '<p class="out-of-stock-label">Out of Stock</p>' : ''}
     `;
 
     const selectProduct = () => {
+      if (isDisabled) {
+        setStatus('staff-cart-status', `${item.name} is out of stock right now.`, 'error');
+        return;
+      }
       staffState.selectedProductId = item.id;
       setText('staff-selected-product', item.name);
       setText('staff-selected-price', `Base price ${formatCurrency(item.price)} before size adjustment.`);
@@ -537,6 +556,10 @@ async function bootStaff() {
       setStatus('staff-cart-status', 'Select a product before adding to the cart.', 'error');
       return;
     }
+    if (product.outOfStock) {
+      setStatus('staff-cart-status', `${product.name} is out of stock right now.`, 'error');
+      return;
+    }
     const customization = readCustomizationForm();
     const existing = staffState.cart.find((line) => line.productId === product.id && customizationMatches(line, customization));
     if (existing) {
@@ -576,6 +599,7 @@ async function bootStaff() {
       });
       staffState.cart = [];
       staffState.preview = { ...EMPTY_PREVIEW };
+      await loadStaffProducts();
       renderCart();
       renderPreview();
       setStatus('staff-preview-status', 'Order submitted successfully.', 'success');
@@ -615,10 +639,11 @@ async function loadStaffProducts() {
   });
   select.onchange = renderStaffProducts;
 
-  if (staffState.products.length && !staffState.selectedProductId) {
-    staffState.selectedProductId = staffState.products[0].id;
-    setText('staff-selected-product', staffState.products[0].name);
-    setText('staff-selected-price', `Base price ${formatCurrency(staffState.products[0].price)} before size adjustment.`);
+  const firstAvailableStaffProduct = getFirstAvailableProduct(staffState.products);
+  if (!staffState.selectedProductId) {
+    staffState.selectedProductId = firstAvailableStaffProduct ? firstAvailableStaffProduct.id : null;
+    setText('staff-selected-product', firstAvailableStaffProduct ? firstAvailableStaffProduct.name : 'No in-stock product selected');
+    setText('staff-selected-price', firstAvailableStaffProduct ? `Base price ${formatCurrency(firstAvailableStaffProduct.price)} before size adjustment.` : 'Products marked out of stock cannot be customized.');
   }
 
   renderStaffProducts();
@@ -1840,17 +1865,24 @@ function renderCustomerProducts() {
 
   visible.forEach((item) => {
     const tile = document.createElement('button');
+    const isDisabled = Boolean(item.outOfStock);
     tile.type = 'button';
-    tile.className = `customer-product-tile customer-tile-${normalizeCustomerCategory(item)}`;
+    tile.className = `customer-product-tile customer-tile-${normalizeCustomerCategory(item)}${isDisabled ? ' customer-product-tile-disabled' : ''}`;
+    tile.disabled = isDisabled;
     tile.innerHTML = `
       <span class="customer-product-overlay">
         <span class="section-label">${escapeHtml(t(item.category) || t(meta.label))}</span>
         <strong>${escapeHtml(t(item.name))}</strong>
         <span>${formatCurrency(item.price)}</span>
+        ${isDisabled ? '<span class="out-of-stock-label">Out of Stock</span>' : ''}
       </span>
     `;
-    tile.setAttribute('aria-label', `${t(item.name)}, ${formatCurrency(item.price)}. Open customization options.`);
-    tile.addEventListener('click', () => openCustomerDialog(item.id));
+    tile.setAttribute('aria-label', isDisabled
+      ? `${t(item.name)}, ${formatCurrency(item.price)}. Out of stock.`
+      : `${t(item.name)}, ${formatCurrency(item.price)}. Open customization options.`);
+    if (!isDisabled) {
+      tile.addEventListener('click', () => openCustomerDialog(item.id));
+    }
     container.appendChild(tile);
   });
 }
@@ -1929,6 +1961,10 @@ function openCustomerDialog(productId) {
   customerState.selectedProductId = productId;
   const product = getCustomerSelectedProduct();
   if (!product) {
+    return;
+  }
+  if (product.outOfStock) {
+    setStatus('customer-cart-status', `${product.name} is out of stock right now.`, 'error');
     return;
   }
   resetCustomerCustomizationForm();
@@ -2050,7 +2086,11 @@ async function handleCustomerCheckout() {
     customerState.cart = [];
     customerState.preview = { ...EMPTY_PREVIEW };
     customerState.rewardDiscount = 0;
+    const productsData = await fetchJson('/api/products');
+    customerState.products = productsData.items || [];
     renderCustomerRewards();
+    renderCustomerCategoryButtons();
+    renderCustomerProducts();
     renderCustomerCart();
     setStatus(
       'customer-cart-status',
