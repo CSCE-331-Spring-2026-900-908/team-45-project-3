@@ -512,6 +512,21 @@ async function bootStaff() {
 
   // 4. Manual Login Form Handler (PIN logic)
   const form = document.getElementById('staff-login-form');
+  const loginForm = document.getElementById('staff-login-form');
+  const pinInput = loginForm.querySelector('input[name="pin"]');
+
+  loginForm.querySelectorAll('.keypad-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (pinInput.value.length < 4) {
+        pinInput.value += btn.dataset.val;
+      }
+    });
+  });
+
+  loginForm.querySelector('.keypad-clear').addEventListener('click', () => {
+    pinInput.value = '';
+    setStatus('staff-login-status', 'PIN cleared.', 'neutral');
+  });
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     setStatus('staff-login-status', 'Authenticating PIN...', 'neutral');
@@ -556,7 +571,7 @@ async function bootStaff() {
     // 3. Reset the UI elements
     document.getElementById('staff-workspace').hidden = true; // Hide the dashboard
     document.getElementById('staff-login-card').hidden = false; // Show the PIN entry
-    
+
     // Clear the PIN input field specifically
     const pinInput = document.querySelector('#staff-login-form [name="pin"]');
     if (pinInput) {
@@ -2380,7 +2395,7 @@ async function boot() {
 
 document.getElementById('login-form')?.addEventListener('submit', async (e) => {
   e.preventDefault();
-  
+
   const payload = {
     username: document.getElementById('username').value,
     password: document.getElementById('password').value,
