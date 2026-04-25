@@ -66,11 +66,16 @@ async function fetchInventoryItems() {
  * Fetches inventory items whose quantity is below the given threshold.
  * Used for the manager low-inventory alert.
  * @param {number} [threshold=60] - Items with quantity strictly less than this value are returned
- * @returns {Promise<Array<{ id: number, name: string, quantity: number }>>}
+ * @returns {Promise<Array<{ id: number, name: string, quantity: number, price: number }>>}
  */
 async function fetchLowInventoryItems(threshold = 60) {
-  const { rows } = await query('SELECT id, name, quantity FROM inventory WHERE quantity < $1 ORDER BY quantity ASC', [threshold]);
-  return rows.map((row) => ({ id: Number(row.id), name: row.name, quantity: Number(row.quantity) }));
+  const { rows } = await query('SELECT id, name, quantity, price FROM inventory WHERE quantity < $1 ORDER BY quantity ASC', [threshold]);
+  return rows.map((row) => ({
+    id: Number(row.id),
+    name: row.name,
+    quantity: Number(row.quantity),
+    price: toMoney(row.price),
+  }));
 }
 
 /**

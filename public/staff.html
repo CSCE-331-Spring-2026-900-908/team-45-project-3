@@ -17,17 +17,30 @@
           <p class="section-label">Step 1</p>
           <h2>Authenticate for cashier access</h2>
           <form id="staff-login-form" class="auth-form">
-            <label>
-              <span>Username</span>
-              <input name="username" type="text" autocomplete="username" required />
+            <label class="field-block">
+              <span>Employee PIN</span>
+              <input name="pin" type="password" placeholder="••••" maxlength="4" style="text-align: center; font-size: 2rem; letter-spacing: 0.4em;" readonly required />
             </label>
-            <label>
-              <span>Password</span>
-              <input name="password" type="password" autocomplete="current-password" required />
-            </label>
-            <button class="action-button" type="submit">Sign In</button>
-          </form>
 
+            <div class="keypad-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 20px 0;">
+              <button type="button" class="ghost-button keypad-btn" data-val="1">1</button>
+              <button type="button" class="ghost-button keypad-btn" data-val="2">2</button>
+              <button type="button" class="ghost-button keypad-btn" data-val="3">3</button>
+              <button type="button" class="ghost-button keypad-btn" data-val="4">4</button>
+              <button type="button" class="ghost-button keypad-btn" data-val="5">5</button>
+              <button type="button" class="ghost-button keypad-btn" data-val="6">6</button>
+              <button type="button" class="ghost-button keypad-btn" data-val="7">7</button>
+              <button type="button" class="ghost-button keypad-btn" data-val="8">8</button>
+              <button type="button" class="ghost-button keypad-btn" data-val="9">9</button>
+              <button type="button" class="ghost-button danger-button keypad-clear">Clear</button>
+              <button type="button" class="ghost-button keypad-btn" data-val="0">0</button>
+              <button type="submit" class="action-button">Go</button>
+            </div>
+
+            <p id="staff-login-status" class="status-text" data-tone="neutral">
+              Enter your 4-digit PIN to unlock the interface.
+            </p>
+          </form>
           <p id="staff-login-status" class="status-text" data-tone="neutral">
             Use your employee credentials to access the cashier interface.
           </p>

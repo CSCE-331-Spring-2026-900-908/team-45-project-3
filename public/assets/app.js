@@ -7,6 +7,7 @@ const staffState = {
   cart: [],
   selectedProductId: null,
   preview: { ...EMPTY_PREVIEW },
+  isSubmittingOrder: false,
 };
 const managerState = {
   menuItems: [],
@@ -15,7 +16,10 @@ const managerState = {
   selectedInventoryId: null,
 };
 const CUSTOMER_CONTRAST_KEY = 'customerHighContrast';
-const CUSTOMER_EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const CUSTOMER_TEXT_SIZE_KEY = 'customerTextScale';
+const CUSTOMER_ZOOM_KEY = 'customerZoomScale';
+const CUSTOMER_PHONE_DIGIT_PATTERN = /\d/g;
+const CUSTOMER_PHONE_NUMBER_LENGTH = 10;
 const CUSTOMER_CATEGORY_ORDER = ['boba-tea', 'milk-tea', 'tea', 'seasonal'];
 const CUSTOMER_CATEGORY_META = {
   'boba-tea': {
@@ -44,7 +48,10 @@ const customerState = {
   profile: null,
   selectedProductId: null,
   highContrast: false,
+  textScale: 1,
+  zoomScale: 1,
   lastDialogTrigger: null,
+  isSubmittingOrder: false,
 };
 // ── Translation ───────────────────────────────────────────────────────────────
 const SUPPORTED_LANGUAGES = [
@@ -324,6 +331,10 @@ function customizationSummary(item) {
   return `${item.size}, ${item.sugarPercent}% sugar${toppings}`;
 }
 
+function getFirstAvailableProduct(products) {
+  return (products || []).find((item) => !item.outOfStock) || null;
+}
+
 function renderStaffProducts() {
   const container = document.getElementById('staff-products');
   const category = document.getElementById('staff-category-filter').value;
@@ -331,21 +342,36 @@ function renderStaffProducts() {
     ? staffState.products
     : staffState.products.filter((item) => item.category === category);
 
+  const selectedVisibleProduct = visible.find((item) => Number(item.id) === Number(staffState.selectedProductId) && !item.outOfStock);
+  if (!selectedVisibleProduct) {
+    const fallbackProduct = getFirstAvailableProduct(visible);
+    staffState.selectedProductId = fallbackProduct ? fallbackProduct.id : null;
+    setText('staff-selected-product', fallbackProduct ? fallbackProduct.name : 'No in-stock product selected');
+    setText('staff-selected-price', fallbackProduct ? `Base price ${formatCurrency(fallbackProduct.price)} before size adjustment.` : 'Products marked out of stock cannot be customized.');
+  }
+
   container.innerHTML = '';
   visible.forEach((item) => {
     const card = document.createElement('article');
-    card.className = `product-card selectable-card${staffState.selectedProductId === item.id ? ' selected' : ''}`;
-    card.tabIndex = 0;
+    const isDisabled = Boolean(item.outOfStock);
+    card.className = `product-card selectable-card${staffState.selectedProductId === item.id ? ' selected' : ''}${isDisabled ? ' product-card-disabled' : ''}`;
+    card.tabIndex = isDisabled ? -1 : 0;
     card.setAttribute('role', 'button');
     card.setAttribute('aria-pressed', staffState.selectedProductId === item.id ? 'true' : 'false');
+    card.setAttribute('aria-disabled', isDisabled ? 'true' : 'false');
     card.innerHTML = `
       <p class="section-label">${escapeHtml(item.category)}</p>
       <h3>${escapeHtml(item.name)}</h3>
       <p class="price-line">$${Number(item.price).toFixed(2)}</p>
-      <p class="muted-line">Click anywhere on this card to customize.</p>
+      <p class="muted-line">${isDisabled ? 'Out of stock.' : 'Click anywhere on this card to customize.'}</p>
+      ${isDisabled ? '<p class="out-of-stock-label">Out of Stock</p>' : ''}
     `;
 
     const selectProduct = () => {
+      if (isDisabled) {
+        setStatus('staff-cart-status', `${item.name} is out of stock right now.`, 'error');
+        return;
+      }
       staffState.selectedProductId = item.id;
       setText('staff-selected-product', item.name);
       setText('staff-selected-price', `Base price ${formatCurrency(item.price)} before size adjustment.`);
@@ -500,42 +526,74 @@ async function bootStaff() {
     await loadStaffProducts();
   }
 
-  // 4. Manual Login Form Handler
+  // 4. Manual Login Form Handler (PIN logic)
   const form = document.getElementById('staff-login-form');
+  const loginForm = document.getElementById('staff-login-form');
+  const pinInput = loginForm.querySelector('input[name="pin"]');
+
+  loginForm.querySelectorAll('.keypad-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (pinInput.value.length < 4) {
+        pinInput.value += btn.dataset.val;
+      }
+    });
+  });
+
+  loginForm.querySelector('.keypad-clear').addEventListener('click', () => {
+    pinInput.value = '';
+    setStatus('staff-login-status', 'PIN cleared.', 'neutral');
+  });
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
-    setStatus('staff-login-status', 'Checking staff credentials...', 'neutral');
+    setStatus('staff-login-status', 'Authenticating PIN...', 'neutral');
     const formData = new FormData(form);
+    const pin = formData.get('pin');
+
+    if (pin.length !== 4) {
+      setStatus('staff-login-status', 'Please enter a 4-digit PIN.', 'error');
+      return;
+    }
+
     try {
       const result = await fetchJson('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: formData.get('username'),
-          password: formData.get('password'),
-          role: 'staff',
-        }),
+        body: JSON.stringify({ pin: pin }) // Fixed variable name
       });
-      saveRoleSession(result);
-      showStaffWorkspace(result);
-      setStatus('staff-login-status', `Signed in as ${result.name || result.username}.`, 'success');
-      await loadStaffProducts();
+
+      if (result.authenticated) {
+        saveRoleSession(result);
+        showStaffWorkspace(result);
+        await loadStaffProducts();
+        setStatus('staff-login-status', `Signed in as ${result.name || 'Staff'}.`, 'success');
+      } else {
+        setStatus('staff-login-status', 'Invalid PIN.', 'error');
+      }
     } catch (error) {
-      setStatus('staff-login-status', error.message, 'error');
+      setStatus('staff-login-status', 'Authentication failed. Please try again.', 'error');
     }
   });
-
   // 5. Sign Out & Navigation
   document.getElementById('staff-sign-out').addEventListener('click', () => {
+    // 1. Clear the session from storage
     clearRoleSession();
+
+    // 2. Reset the internal staff state (Cart, Products, etc.)
     staffState.cart = [];
     staffState.products = [];
     staffState.selectedProductId = null;
     staffState.preview = { ...EMPTY_PREVIEW };
-    document.getElementById('staff-workspace').hidden = true;
-    document.getElementById('staff-login-card').hidden = false;
-    document.querySelector('#staff-login-form [name="username"]').value = '';
-    document.querySelector('#staff-login-form [name="password"]').value = '';
+
+    // 3. Reset the UI elements
+    document.getElementById('staff-workspace').hidden = true; // Hide the dashboard
+    document.getElementById('staff-login-card').hidden = false; // Show the PIN entry
+
+    // Clear the PIN input field specifically
+    const pinInput = document.querySelector('#staff-login-form [name="pin"]');
+    if (pinInput) {
+      pinInput.value = '';
+    }
+
     setStatus('staff-login-status', 'Signed out successfully.', 'neutral');
   });
 
@@ -548,6 +606,10 @@ async function bootStaff() {
     const product = getSelectedProduct();
     if (!product) {
       setStatus('staff-cart-status', 'Select a product before adding to the cart.', 'error');
+      return;
+    }
+    if (product.outOfStock) {
+      setStatus('staff-cart-status', `${product.name} is out of stock right now.`, 'error');
       return;
     }
     const customization = readCustomizationForm();
@@ -575,7 +637,12 @@ async function bootStaff() {
 
   document.getElementById('staff-preview-order').addEventListener('click', refreshPreview);
   document.getElementById('staff-submit-order').addEventListener('click', async () => {
-    if (!staffState.cart.length) return;
+    if (!staffState.cart.length || staffState.isSubmittingOrder) return;
+    staffState.isSubmittingOrder = true;
+    const submitButton = document.getElementById('staff-submit-order');
+    if (submitButton) {
+      submitButton.disabled = true;
+    }
     try {
       await fetchJson('/api/orders', {
         method: 'POST',
@@ -584,11 +651,17 @@ async function bootStaff() {
       });
       staffState.cart = [];
       staffState.preview = { ...EMPTY_PREVIEW };
+      await loadStaffProducts();
       renderCart();
       renderPreview();
       setStatus('staff-preview-status', 'Order submitted successfully.', 'success');
     } catch (error) {
       setStatus('staff-preview-status', error.message, 'error');
+    } finally {
+      staffState.isSubmittingOrder = false;
+      if (submitButton) {
+        submitButton.disabled = false;
+      }
     }
   });
 }
@@ -618,10 +691,11 @@ async function loadStaffProducts() {
   });
   select.onchange = renderStaffProducts;
 
-  if (staffState.products.length && !staffState.selectedProductId) {
-    staffState.selectedProductId = staffState.products[0].id;
-    setText('staff-selected-product', staffState.products[0].name);
-    setText('staff-selected-price', `Base price ${formatCurrency(staffState.products[0].price)} before size adjustment.`);
+  const firstAvailableStaffProduct = getFirstAvailableProduct(staffState.products);
+  if (!staffState.selectedProductId) {
+    staffState.selectedProductId = firstAvailableStaffProduct ? firstAvailableStaffProduct.id : null;
+    setText('staff-selected-product', firstAvailableStaffProduct ? firstAvailableStaffProduct.name : 'No in-stock product selected');
+    setText('staff-selected-price', firstAvailableStaffProduct ? `Base price ${formatCurrency(firstAvailableStaffProduct.price)} before size adjustment.` : 'Products marked out of stock cannot be customized.');
   }
 
   renderStaffProducts();
@@ -636,8 +710,16 @@ function renderTable(containerId, columns, rows, options = {}) {
     return;
   }
 
+  container.innerHTML = '';
+  if (options.beforeTable instanceof HTMLElement) {
+    container.appendChild(options.beforeTable);
+  }
+
   if (!rows.length) {
-    container.innerHTML = '<p class="muted-line">No data found.</p>';
+    const empty = document.createElement('p');
+    empty.className = 'muted-line';
+    empty.textContent = 'No data found.';
+    container.appendChild(empty);
     return;
   }
 
@@ -665,15 +747,18 @@ function renderTable(containerId, columns, rows, options = {}) {
     }
     columns.forEach((column) => {
       const td = document.createElement('td');
-      const value = row[column.key];
-      td.textContent = value === undefined || value === null ? '' : String(value);
+      const value = typeof column.render === 'function' ? column.render(row) : row[column.key];
+      if (value instanceof HTMLElement) {
+        td.appendChild(value);
+      } else {
+        td.textContent = value === undefined || value === null ? '' : String(value);
+      }
       tr.appendChild(td);
     });
     tbody.appendChild(tr);
   });
   table.appendChild(tbody);
 
-  container.innerHTML = '';
   container.appendChild(table);
 }
 
@@ -1010,11 +1095,116 @@ async function runReportTotalRevenue() {
 
 async function runReportLowInventory() {
   const data = await fetchJson('/api/inventory/low');
+  const estimateRestockCost = (item, targetQuantity) => {
+    const currentQuantity = Math.max(0, Number(item.quantity) || 0);
+    const desiredQuantity = Math.max(0, Number(targetQuantity) || 0);
+    const unitsToBuy = Math.max(0, desiredQuantity - currentQuantity);
+    return Number((unitsToBuy * Number(item.price || 0)).toFixed(2));
+  };
+  const bulkControls = document.createElement('div');
+  bulkControls.className = 'button-row';
+
+  const bulkInput = document.createElement('input');
+  bulkInput.type = 'number';
+  bulkInput.min = '0';
+  bulkInput.value = '100';
+  bulkInput.className = 'numeric-input';
+  bulkInput.style.maxWidth = '140px';
+
+  const bulkCost = document.createElement('span');
+  bulkCost.className = 'muted-line';
+
+  const updateBulkCost = () => {
+    const nextQuantity = Math.max(0, Number(bulkInput.value) || 0);
+    const totalCost = (data.items || []).reduce((sum, item) => sum + estimateRestockCost(item, nextQuantity), 0);
+    bulkCost.textContent = `Estimated total cost: ${formatCurrency(totalCost)}`;
+  };
+  bulkInput.addEventListener('input', updateBulkCost);
+
+  const bulkButton = document.createElement('button');
+  bulkButton.type = 'button';
+  bulkButton.className = 'action-button mini-button';
+  bulkButton.textContent = 'Restock All To';
+  bulkButton.addEventListener('click', async () => {
+    const nextQuantity = Math.max(0, Number(bulkInput.value) || 0);
+    await runManagerAction(async () => {
+      for (const item of data.items || []) {
+        await fetchJson('/api/inventory/quantity', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ inventoryId: item.id, quantity: nextQuantity }),
+        });
+      }
+      await loadManagerInventoryTable();
+      await runReportLowInventory();
+    }, 'manager-reports-status', `All low inventory items were restocked to ${nextQuantity}.`);
+  });
+
+  bulkControls.appendChild(bulkInput);
+  bulkControls.appendChild(bulkButton);
+  bulkControls.appendChild(bulkCost);
+  updateBulkCost();
+
   renderTable('manager-report-table', [
     { key: 'id', label: 'ID' },
     { key: 'name', label: 'Name' },
     { key: 'quantity', label: 'Quantity' },
-  ], data.items || []);
+    {
+      key: 'price',
+      label: 'Unit Price',
+      render: (item) => formatCurrency(item.price),
+    },
+    {
+      key: 'restock',
+      label: 'Restock To',
+      render: (item) => {
+        const wrap = document.createElement('div');
+        wrap.className = 'button-row';
+
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.min = '0';
+        input.value = '100';
+        input.className = 'numeric-input';
+        input.style.maxWidth = '110px';
+
+        const cost = document.createElement('span');
+        cost.className = 'muted-line';
+        const updateCost = () => {
+          cost.textContent = formatCurrency(estimateRestockCost(item, input.value));
+        };
+        input.addEventListener('input', updateCost);
+        updateCost();
+
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'ghost-button mini-button';
+        button.textContent = 'Restock';
+        button.addEventListener('click', async (event) => {
+          event.stopPropagation();
+          const nextQuantity = Math.max(0, Number(input.value) || 0);
+          await runManagerAction(async () => {
+            await fetchJson('/api/inventory/quantity', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ inventoryId: item.id, quantity: nextQuantity }),
+            });
+            await loadManagerInventoryTable();
+            await runReportLowInventory();
+          }, 'manager-reports-status', `Inventory item #${item.id} restocked to ${nextQuantity}.`);
+          const refreshedItem = managerState.inventoryItems.find((entry) => Number(entry.id) === Number(item.id));
+          if (refreshedItem) {
+            applyInventorySelection({ ...refreshedItem, rawPrice: refreshedItem.price });
+          }
+        });
+
+        wrap.appendChild(input);
+        wrap.appendChild(cost);
+        wrap.appendChild(button);
+        return wrap;
+      },
+    },
+  ], data.items || [], { beforeTable: bulkControls });
   setStatus('manager-reports-status', 'Loaded low inventory report.', 'success');
 }
 
@@ -1438,15 +1628,24 @@ async function loadManagerWorkspace() {
   setStatus('manager-dashboard-status', 'Manager workspace synced with the live database.', 'success');
 }
 
-function normalizeCustomerEmail(email) {
-  return String(email || '').trim().toLowerCase();
+function normalizeCustomerPhoneNumber(phoneNumber) {
+  return (String(phoneNumber || '').match(CUSTOMER_PHONE_DIGIT_PATTERN) || [])
+    .join('')
+    .slice(0, CUSTOMER_PHONE_NUMBER_LENGTH);
+}
+
+function formatCustomerPhoneNumber(phoneNumber) {
+  const digits = normalizeCustomerPhoneNumber(phoneNumber);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
 }
 
 function saveCustomerProfile(profile) {
   customerState.profile = profile
     ? {
       ...profile,
-      email: normalizeCustomerEmail(profile.email),
+      phoneNumber: normalizeCustomerPhoneNumber(profile.phoneNumber),
       orderCount: Number(profile.orderCount || 0),
       customerId: profile.customerId != null ? Number(profile.customerId) : null,
       freeDrinkCredits: Number(profile.freeDrinkCredits || 0),
@@ -1461,24 +1660,13 @@ function clearCustomerProfile() {
 function readCustomerRewardsCredentials() {
   const formData = new FormData(document.getElementById('customer-login-form'));
   return {
-    name: String(formData.get('name') || '').trim(),
-    email: normalizeCustomerEmail(formData.get('email')),
-    password: String(formData.get('password') || ''),
+    phoneNumber: normalizeCustomerPhoneNumber(formData.get('phoneNumber')),
   };
 }
 
-function validateCustomerRewardsCredentials(credentials, requireName = false) {
-  if (!CUSTOMER_EMAIL_PATTERN.test(credentials.email)) {
-    throw new Error('Enter a valid email address.');
-  }
-  if (!credentials.password) {
-    throw new Error('Enter your password.');
-  }
-  if (credentials.password.length < 8) {
-    throw new Error('Password must be at least 8 characters.');
-  }
-  if (requireName && !credentials.name) {
-    throw new Error('Enter a name for the rewards account.');
+function validateCustomerRewardsCredentials(credentials) {
+  if (normalizeCustomerPhoneNumber(credentials.phoneNumber).length !== CUSTOMER_PHONE_NUMBER_LENGTH) {
+    throw new Error('Enter a 10-digit phone number.');
   }
 }
 
@@ -1491,6 +1679,16 @@ function loadCustomerContrastPreference() {
   return localStorage.getItem(CUSTOMER_CONTRAST_KEY) === 'true';
 }
 
+function loadCustomerTextScalePreference() {
+  const value = Number(localStorage.getItem(CUSTOMER_TEXT_SIZE_KEY) || 1);
+  return [1, 1.1, 1.2, 1.35].includes(value) ? value : 1;
+}
+
+function loadCustomerZoomPreference() {
+  const value = Number(localStorage.getItem(CUSTOMER_ZOOM_KEY) || 1);
+  return Math.min(1.4, Math.max(0.9, Number.isFinite(value) ? value : 1));
+}
+
 function setCustomerContrastPreference(enabled) {
   customerState.highContrast = enabled;
   document.body.classList.toggle('high-contrast', enabled);
@@ -1500,6 +1698,34 @@ function setCustomerContrastPreference(enabled) {
     button.setAttribute('aria-pressed', enabled ? 'true' : 'false');
     button.textContent = enabled ? 'Use Standard Contrast' : 'Enable High Contrast';
   }
+}
+
+function setCustomerTextScale(scale) {
+  customerState.textScale = scale;
+  document.documentElement.style.setProperty('--customer-text-scale', String(scale));
+  localStorage.setItem(CUSTOMER_TEXT_SIZE_KEY, String(scale));
+  const select = document.getElementById('customer-text-size');
+  if (select) {
+    select.value = String(scale);
+  }
+}
+
+function setCustomerZoomScale(scale) {
+  const normalized = Math.min(1.4, Math.max(0.9, Number(scale) || 1));
+  customerState.zoomScale = normalized;
+  document.documentElement.style.setProperty('--customer-zoom-scale', String(normalized));
+  localStorage.setItem(CUSTOMER_ZOOM_KEY, String(normalized));
+  setText('customer-zoom-readout', `${Math.round(normalized * 100)}%`);
+}
+
+function setCustomerAccessibilityPanelOpen(isOpen) {
+  const panel = document.querySelector('.customer-accessibility-tools');
+  const toggle = document.getElementById('customer-accessibility-toggle');
+  if (!panel || !toggle) {
+    return;
+  }
+  panel.hidden = !isOpen;
+  toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
 }
 
 function normalizeCustomerCategory(product) {
@@ -1628,16 +1854,14 @@ function renderCustomerRewards() {
     meta.textContent = '0 of 5 orders completed';
     bar.style.width = '0%';
     if (idLine) idLine.textContent = '';
-    setFieldValue('customer-name', '');
-    setFieldValue('customer-email', '');
-    setFieldValue('customer-password', '');
+    setFieldValue('customer-phone', '');
     return;
   }
 
   const reward = getCustomerRewardProgress();
   const credits = customerState.profile.freeDrinkCredits || 0;
 
-  heading.textContent = customerState.profile.name || customerState.profile.email;
+  heading.textContent = formatCustomerPhoneNumber(customerState.profile.phoneNumber);
 
   if (credits > 0) {
     copy.textContent = credits === 1
@@ -1656,9 +1880,7 @@ function renderCustomerRewards() {
       : '';
   }
 
-  setFieldValue('customer-name', customerState.profile.name || '');
-  setFieldValue('customer-email', customerState.profile.email || '');
-  setFieldValue('customer-password', '');
+  setFieldValue('customer-phone', formatCustomerPhoneNumber(customerState.profile.phoneNumber || ''));
 }
 
 function activateCustomerCategory(categoryKey, focusButton = false) {
@@ -1733,17 +1955,24 @@ function renderCustomerProducts() {
 
   visible.forEach((item) => {
     const tile = document.createElement('button');
+    const isDisabled = Boolean(item.outOfStock);
     tile.type = 'button';
-    tile.className = `customer-product-tile customer-tile-${normalizeCustomerCategory(item)}`;
+    tile.className = `customer-product-tile customer-tile-${normalizeCustomerCategory(item)}${isDisabled ? ' customer-product-tile-disabled' : ''}`;
+    tile.disabled = isDisabled;
     tile.innerHTML = `
       <span class="customer-product-overlay">
         <span class="section-label">${escapeHtml(t(item.category) || t(meta.label))}</span>
         <strong>${escapeHtml(t(item.name))}</strong>
         <span>${formatCurrency(item.price)}</span>
+        ${isDisabled ? '<span class="out-of-stock-label">Out of Stock</span>' : ''}
       </span>
     `;
-    tile.setAttribute('aria-label', `${t(item.name)}, ${formatCurrency(item.price)}. Open customization options.`);
-    tile.addEventListener('click', () => openCustomerDialog(item.id));
+    tile.setAttribute('aria-label', isDisabled
+      ? `${t(item.name)}, ${formatCurrency(item.price)}. Out of stock.`
+      : `${t(item.name)}, ${formatCurrency(item.price)}. Open customization options.`);
+    if (!isDisabled) {
+      tile.addEventListener('click', () => openCustomerDialog(item.id));
+    }
     container.appendChild(tile);
   });
 }
@@ -1824,6 +2053,10 @@ function openCustomerDialog(productId) {
   if (!product) {
     return;
   }
+  if (product.outOfStock) {
+    setStatus('customer-cart-status', `${product.name} is out of stock right now.`, 'error');
+    return;
+  }
   resetCustomerCustomizationForm();
   setText('customer-dialog-title', product.name);
   setText('customer-dialog-price', `Base price ${formatCurrency(product.price)}. Adjust size, sweetness, and toppings.`);
@@ -1884,69 +2117,114 @@ async function handleCustomerCheckout() {
     setStatus('customer-cart-status', 'Add at least one drink before placing an order.', 'error');
     return;
   }
-
-  setStatus('customer-cart-status', 'Submitting your order...', 'neutral');
-  try {
-    await fetchJson('/api/orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        items: customerState.cart.map(toOrderPayload),
-        payment: {
-          primaryPaymentType: 'Credit Card',
-          secondaryPaymentType: null,
-          giftAmount: customerState.rewardDiscount,
-          cashReceived: 0,
-          cashChange: 0,
-          totalAmount: Math.max(0, Number(customerState.preview.total || 0) - customerState.rewardDiscount),
-        },
-      }),
-    });
-  } catch (error) {
-    if (!String(error.message || '').includes('disabled')) {
-      throw error;
-    }
+  if (customerState.isSubmittingOrder) {
+    setStatus('customer-cart-status', 'Your order is already being submitted.', 'neutral');
+    return;
   }
 
-  const rewardUsed = customerState.rewardDiscount > 0;
-  let rewardsMessage = '';
-  if (customerState.profile) {
+  customerState.isSubmittingOrder = true;
+  const checkoutButton = document.getElementById('customer-checkout');
+  if (checkoutButton) {
+    checkoutButton.disabled = true;
+  }
+  setStatus('customer-cart-status', 'Submitting your order...', 'neutral');
+  try {
     try {
-      // If a free drink credit was applied, consume it from the DB first
-      if (rewardUsed) {
-        const redeemUpdate = await fetchJson('/api/customer/rewards/redeem', {
+      await fetchJson('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: customerState.cart.map(toOrderPayload),
+          payment: {
+            primaryPaymentType: 'Credit Card',
+            secondaryPaymentType: null,
+            giftAmount: customerState.rewardDiscount,
+            cashReceived: 0,
+            cashChange: 0,
+            totalAmount: Math.max(0, Number(customerState.preview.total || 0) - customerState.rewardDiscount),
+          },
+        }),
+      });
+    } catch (error) {
+      if (!String(error.message || '').includes('disabled')) {
+        throw error;
+      }
+    }
+
+    const rewardUsed = customerState.rewardDiscount > 0;
+    let rewardsMessage = '';
+    if (customerState.profile) {
+      try {
+        if (rewardUsed) {
+          const redeemUpdate = await fetchJson('/api/customer/rewards/redeem', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+          });
+          saveCustomerProfile(redeemUpdate.profile);
+        }
+        const rewardsUpdate = await fetchJson('/api/customer/rewards/increment', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
         });
-        saveCustomerProfile(redeemUpdate.profile);
+        saveCustomerProfile(rewardsUpdate.profile);
+      } catch (error) {
+        rewardsMessage = String(error.message || '').includes('disabled')
+          ? ' Order was accepted, but rewards could not update while database writes are disabled.'
+          : ' Order was accepted, but rewards could not be updated.';
       }
-      // Always increment the point counter for logged-in customers
-      const rewardsUpdate = await fetchJson('/api/customer/rewards/increment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      saveCustomerProfile(rewardsUpdate.profile);
-    } catch (error) {
-      rewardsMessage = String(error.message || '').includes('disabled')
-        ? ' Order was accepted, but rewards could not update while database writes are disabled.'
-        : ' Order was accepted, but rewards could not be updated.';
+    }
+    customerState.cart = [];
+    customerState.preview = { ...EMPTY_PREVIEW };
+    customerState.rewardDiscount = 0;
+    const productsData = await fetchJson('/api/products');
+    customerState.products = productsData.items || [];
+    renderCustomerRewards();
+    renderCustomerCategoryButtons();
+    renderCustomerProducts();
+    renderCustomerCart();
+    setStatus(
+      'customer-cart-status',
+      (rewardUsed ? 'Order placed. Your free drink reward was applied.' : 'Order placed. Rewards progress has been updated.') + rewardsMessage,
+      'success'
+    );
+  } catch (error) {
+    setStatus('customer-cart-status', error.message || 'Unable to submit your order.', 'error');
+  } finally {
+    customerState.isSubmittingOrder = false;
+    if (checkoutButton) {
+      checkoutButton.disabled = false;
     }
   }
-  customerState.cart = [];
-  customerState.preview = { ...EMPTY_PREVIEW };
-  customerState.rewardDiscount = 0;
-  renderCustomerRewards();
-  renderCustomerCart();
-  setStatus(
-    'customer-cart-status',
-    (rewardUsed ? 'Order placed. Your free drink reward was applied.' : 'Order placed. Rewards progress has been updated.') + rewardsMessage,
-    'success'
-  );
 }
 
 function attachCustomerEventHandlers() {
+  document.getElementById('customer-accessibility-toggle')?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const panel = document.querySelector('.customer-accessibility-tools');
+    setCustomerAccessibilityPanelOpen(Boolean(panel?.hidden));
+  });
+  document.querySelector('.customer-accessibility-tools')?.addEventListener('click', (event) => {
+    event.stopPropagation();
+  });
+  document.addEventListener('click', () => {
+    setCustomerAccessibilityPanelOpen(false);
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      setCustomerAccessibilityPanelOpen(false);
+    }
+  });
   document.getElementById('customer-contrast-toggle').addEventListener('click', () => {
     setCustomerContrastPreference(!customerState.highContrast);
+  });
+  document.getElementById('customer-text-size')?.addEventListener('change', (event) => {
+    setCustomerTextScale(Number(event.target.value) || 1);
+  });
+  document.getElementById('customer-zoom-decrease')?.addEventListener('click', () => {
+    setCustomerZoomScale(Number((customerState.zoomScale - 0.1).toFixed(2)));
+  });
+  document.getElementById('customer-zoom-increase')?.addEventListener('click', () => {
+    setCustomerZoomScale(Number((customerState.zoomScale + 0.1).toFixed(2)));
   });
   document.getElementById('customer-qty-decrement').addEventListener('click', () => {
     adjustCustomerQuantity(-1);
@@ -1957,6 +2235,9 @@ function attachCustomerEventHandlers() {
   document.getElementById('customer-qty').addEventListener('input', (event) => {
     setCustomerQuantity(event.target.value);
   });
+  document.getElementById('customer-phone')?.addEventListener('input', (event) => {
+    event.target.value = formatCustomerPhoneNumber(event.target.value);
+  });
 
   document.getElementById('customer-login-form').addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -1966,10 +2247,7 @@ function attachCustomerEventHandlers() {
       const result = await fetchJson('/api/customer/rewards/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: credentials.email,
-          password: credentials.password,
-        }),
+        body: JSON.stringify(credentials),
       });
       saveCustomerProfile(result.profile);
       renderCustomerRewards();
@@ -1984,7 +2262,7 @@ function attachCustomerEventHandlers() {
   document.getElementById('customer-register').addEventListener('click', async () => {
     try {
       const credentials = readCustomerRewardsCredentials();
-      validateCustomerRewardsCredentials(credentials, true);
+      validateCustomerRewardsCredentials(credentials);
       const result = await fetchJson('/api/customer/rewards/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2063,8 +2341,21 @@ function attachCustomerEventHandlers() {
 }
 
 async function bootCustomer() {
+  const accessibilityPanel = document.querySelector('.customer-accessibility-tools');
+  const accessibilityToggle = document.getElementById('customer-accessibility-toggle');
+  if (accessibilityPanel && accessibilityToggle) {
+    if (accessibilityPanel.parentElement !== document.body) {
+      document.body.insertBefore(accessibilityPanel, accessibilityToggle);
+    }
+    accessibilityPanel.id = 'customer-accessibility-panel';
+    accessibilityPanel.hidden = true;
+  }
   customerState.highContrast = loadCustomerContrastPreference();
+  customerState.textScale = loadCustomerTextScalePreference();
+  customerState.zoomScale = loadCustomerZoomPreference();
   setCustomerContrastPreference(customerState.highContrast);
+  setCustomerTextScale(customerState.textScale);
+  setCustomerZoomScale(customerState.zoomScale);
   await loadCustomerRewardsSession();
   renderCustomerRewards();
   renderCustomerCart();
@@ -2120,7 +2411,7 @@ async function boot() {
 
 document.getElementById('login-form')?.addEventListener('submit', async (e) => {
   e.preventDefault();
-  
+
   const payload = {
     username: document.getElementById('username').value,
     password: document.getElementById('password').value,

@@ -147,9 +147,21 @@ function createApp() {
 
   // --- Legacy / Standard Login API Route ---
   app.post('/api/auth/login', asyncHandler(async (req, res) => {
-    const { username, password, role } = req.body || {};
-    const result = await db.authenticateEmployee(username, password, role);
-    res.status(result.authenticated ? 200 : 401).json({ source: 'database', ...result });
+    const { username, password, pin, role } = req.body || {};
+    let result;
+
+    if (pin) {
+      result = await db.authenticateEmployeeByPin(pin);
+    } else {
+      result = await db.authenticateEmployee(username, password, role);
+    }
+
+    // Double check this line:
+    if (result && result.authenticated === true) { 
+      res.status(200).json(result);
+    } else {
+      res.status(401).json({ authenticated: false, message: "Login failed" });
+    }
   }));
 
   app.get('/api/auth/status', (req, res) => {
@@ -161,15 +173,15 @@ function createApp() {
   });
 
   app.get('/api/customer/rewards/session', asyncHandler(async (req, res) => {
-    const rewardsEmail = req.session.customerRewardsEmail;
-    if (!rewardsEmail) {
+    const rewardsPhoneNumber = req.session.customerRewardsPhoneNumber;
+    if (!rewardsPhoneNumber) {
       res.json({ authenticated: false });
       return;
     }
 
-    const profile = await db.fetchRewardsAccountByEmail(rewardsEmail);
+    const profile = await db.fetchRewardsAccountByPhone(rewardsPhoneNumber);
     if (!profile) {
-      delete req.session.customerRewardsEmail;
+      delete req.session.customerRewardsPhoneNumber;
       res.json({ authenticated: false });
       return;
     }
@@ -180,19 +192,19 @@ function createApp() {
   app.post('/api/customer/rewards/register', asyncHandler(async (req, res) => {
     ensureWritesEnabled();
     const profile = await db.registerRewardsAccount(req.body || {});
-    req.session.customerRewardsEmail = profile.email;
+    req.session.customerRewardsPhoneNumber = profile.phoneNumber;
     res.status(201).json({ authenticated: true, profile });
   }));
 
   app.post('/api/customer/rewards/login', asyncHandler(async (req, res) => {
-    const { email, password } = req.body || {};
-    const profile = await db.authenticateRewardsAccount(email, password);
-    req.session.customerRewardsEmail = profile.email;
+    const { phoneNumber } = req.body || {};
+    const profile = await db.authenticateRewardsAccount(phoneNumber);
+    req.session.customerRewardsPhoneNumber = profile.phoneNumber;
     res.json({ authenticated: true, profile });
   }));
 
   app.post('/api/customer/rewards/logout', (req, res) => {
-    delete req.session.customerRewardsEmail;
+    delete req.session.customerRewardsPhoneNumber;
     res.json({ ok: true });
   });
 
@@ -207,7 +219,17 @@ function createApp() {
 
   // --- Read-only API routes ---
   app.get('/api/products', asyncHandler(async (_, res) => {
-    res.json({ source: 'database', items: await db.fetchProducts() });
+    const [items, availability] = await Promise.all([
+      db.fetchProducts(),
+      db.fetchProductAvailability(),
+    ]);
+    res.json({
+      source: 'database',
+      items: items.map((item) => ({
+        ...item,
+        outOfStock: availability.get(item.id) === false,
+      })),
+    });
   }));
 
   app.get('/api/categories', asyncHandler(async (_, res) => {
@@ -281,8 +303,8 @@ function createApp() {
 
   app.post('/api/customer/rewards/increment', asyncHandler(async (req, res) => {
     ensureWritesEnabled();
-    const rewardsEmail = req.session.customerRewardsEmail;
-    if (!rewardsEmail) {
+    const rewardsPhoneNumber = req.session.customerRewardsPhoneNumber;
+    if (!rewardsPhoneNumber) {
       const error = new Error('Sign in to a rewards account before updating rewards.');
       error.statusCode = 401;
       throw error;
@@ -290,14 +312,14 @@ function createApp() {
 
     res.json({
       ok: true,
-      profile: await db.incrementRewardsCounter(rewardsEmail),
+      profile: await db.incrementRewardsCounter(rewardsPhoneNumber),
     });
   }));
 
   app.post('/api/customer/rewards/redeem', asyncHandler(async (req, res) => {
     ensureWritesEnabled();
-    const rewardsEmail = req.session.customerRewardsEmail;
-    if (!rewardsEmail) {
+    const rewardsPhoneNumber = req.session.customerRewardsPhoneNumber;
+    if (!rewardsPhoneNumber) {
       const error = new Error('Sign in to a rewards account before redeeming a free drink.');
       error.statusCode = 401;
       throw error;
@@ -305,7 +327,7 @@ function createApp() {
 
     res.json({
       ok: true,
-      profile: await db.redeemFreeDrinkCredit(rewardsEmail),
+      profile: await db.redeemFreeDrinkCredit(rewardsPhoneNumber),
     });
   }));
 
