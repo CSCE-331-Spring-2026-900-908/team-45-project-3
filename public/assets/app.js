@@ -58,6 +58,8 @@ const SUPPORTED_LANGUAGES = [
 
 const translationCache = {}; // { 'lang:text': translatedText }
 let currentLang = 'en';
+let translationSeq = 0;  // guards against stale async renders
+let bgPrefetchDone = false;
 
 // Sync lookup — returns cached translation or original text
 function t(text) {
@@ -65,30 +67,39 @@ function t(text) {
   return translationCache[`${currentLang}:${text}`] || text;
 }
 
-// Fetch one translation from the backend (cached)
-async function translateOne(text, lang) {
-  if (!text || lang === 'en') return text;
-  const key = `${lang}:${text}`;
-  if (translationCache[key]) return translationCache[key];
+function collectAllTranslatableStrings() {
+  const staticTexts = Array.from(document.querySelectorAll('[data-i18n]'))
+    .map((el) => el.dataset.i18n)
+    .filter(Boolean);
+  const productTexts = customerState.products.flatMap((p) => [p.name, p.category]);
+  const categoryTexts = Object.values(CUSTOMER_CATEGORY_META).flatMap((m) => [m.label, m.description]);
+  return [...new Set([...staticTexts, ...productTexts, ...categoryTexts])].filter(Boolean);
+}
+
+async function fetchTranslations(texts, lang) {
+  if (!texts.length) return;
   try {
     const data = await fetchJson('/api/translate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, targetLang: lang }),
+      body: JSON.stringify({ texts, targetLang: lang }),
     });
-    translationCache[key] = data.translatedText || text;
-    return translationCache[key];
-  } catch {
-    return text;
+    if (data.translations) {
+      for (const [original, translated] of Object.entries(data.translations)) {
+        translationCache[`${lang}:${original}`] = translated;
+      }
+    }
+  } catch (err) {
+    console.error(`Translation to ${lang} failed:`, err);
   }
 }
 
 // Translate all [data-i18n] elements + pre-cache product names, then re-render
 async function applyLanguage(lang) {
   currentLang = lang;
+  const seq = ++translationSeq;
 
   if (lang === 'en') {
-    // Restore all static elements to their original English text
     document.querySelectorAll('[data-i18n]').forEach((el) => {
       el.textContent = el.dataset.i18n;
     });
@@ -97,27 +108,32 @@ async function applyLanguage(lang) {
     return;
   }
 
-  // Collect all unique strings that need translating
-  const staticTexts = Array.from(document.querySelectorAll('[data-i18n]'))
-    .map((el) => el.dataset.i18n)
-    .filter(Boolean);
+  const allUnique = collectAllTranslatableStrings();
 
-  const productTexts = customerState.products.flatMap((p) => [p.name, p.category]);
-  const categoryTexts = Object.values(CUSTOMER_CATEGORY_META).flatMap((m) => [m.label, m.description]);
+  // Fetch translations for the selected language (awaited — needed before render)
+  const uncached = allUnique.filter((text) => !translationCache[`${lang}:${text}`]);
+  await fetchTranslations(uncached, lang);
 
-  const allUnique = [...new Set([...staticTexts, ...productTexts, ...categoryTexts])];
+  // Guard: discard if user switched again while we were waiting
+  if (seq !== translationSeq) return;
 
-  // Fetch all translations in parallel
-  await Promise.all(allUnique.map((text) => translateOne(text, lang)));
-
-  // Apply to static [data-i18n] elements
   document.querySelectorAll('[data-i18n]').forEach((el) => {
     el.textContent = t(el.dataset.i18n);
   });
-
-  // Re-render dynamic sections (they call t() internally now)
   renderCustomerCategoryButtons();
   renderCustomerProducts();
+
+  // After rendering, silently prefetch the other languages in the background
+  if (!bgPrefetchDone) {
+    bgPrefetchDone = true;
+    const otherLangs = SUPPORTED_LANGUAGES
+      .map((l) => l.code)
+      .filter((code) => code !== 'en' && code !== lang);
+    for (const otherLang of otherLangs) {
+      const toFetch = allUnique.filter((text) => !translationCache[`${otherLang}:${text}`]);
+      fetchTranslations(toFetch, otherLang); // intentionally not awaited
+    }
+  }
 }
 
 const INVENTORY_CATEGORY_OPTIONS = [

@@ -400,31 +400,48 @@ function createApp() {
     res.json({ source: 'database', rows: await db.deleteEmployee(employeeId) });
   }));
 
-  // --- Machine Translation route ---
-  app.post('/api/translate', asyncHandler(async (req, res) => {
-    const { text, targetLang } = req.body || {};
+  // Google uses zh-CN for Simplified Chinese; all other codes match directly
+  const GOOGLE_LANG_MAP = { zh: 'zh-CN' };
 
-    if (!text || !targetLang) {
-      res.status(400).json({ error: 'text and targetLang are required.' });
+  // --- Machine Translation route (Google Cloud Translation API) ---
+  app.post('/api/translate', asyncHandler(async (req, res) => {
+    const { texts, targetLang } = req.body || {};
+
+    if (!targetLang || !Array.isArray(texts) || texts.length === 0) {
+      res.status(400).json({ error: 'texts (array) and targetLang are required.' });
       return;
     }
 
     if (targetLang === 'en') {
-      res.json({ translatedText: text });
+      res.json({ translations: Object.fromEntries(texts.map((s) => [s, s])) });
       return;
     }
 
-    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(String(text).slice(0, 500))}&langpair=en|${encodeURIComponent(targetLang)}`;
-    const response = await fetch(url);
+    const apiKey = process.env.GOOGLE_TRANSLATE_API_KEY;
+    if (!apiKey) {
+      res.status(503).json({ error: 'Translation service not configured. Set GOOGLE_TRANSLATE_API_KEY in the environment.' });
+      return;
+    }
+
+    const googleLang = GOOGLE_LANG_MAP[targetLang] || targetLang;
+    const url = `https://translation.googleapis.com/language/translate/v2?key=${apiKey}`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ q: texts, target: googleLang, source: 'en', format: 'text' }),
+    });
 
     if (!response.ok) {
-      res.status(502).json({ error: 'Translation service unavailable.' });
+      const err = await response.json().catch(() => ({}));
+      res.status(502).json({ error: err?.error?.message || 'Google Translate request failed.' });
       return;
     }
 
     const data = await response.json();
-    const translatedText = data?.responseData?.translatedText || text;
-    res.json({ translatedText });
+    const translated = data?.data?.translations?.map((t) => t.translatedText) ?? texts;
+
+    res.json({ translations: Object.fromEntries(texts.map((s, i) => [s, translated[i] ?? s])) });
   }));
 
   // --- AI Chatbot route ---
