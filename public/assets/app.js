@@ -84,7 +84,7 @@ function collectAllTranslatableStrings() {
 }
 
 async function fetchTranslations(texts, lang) {
-  if (!texts.length) return;
+  if (!texts.length) return true;
   try {
     const data = await fetchJson('/api/translate', {
       method: 'POST',
@@ -96,8 +96,10 @@ async function fetchTranslations(texts, lang) {
         translationCache[`${lang}:${original}`] = translated;
       }
     }
+    return true;
   } catch (err) {
     console.error(`Translation to ${lang} failed:`, err);
+    return false;
   }
 }
 
@@ -119,10 +121,15 @@ async function applyLanguage(lang) {
 
   // Fetch translations for the selected language (awaited — needed before render)
   const uncached = allUnique.filter((text) => !translationCache[`${lang}:${text}`]);
-  await fetchTranslations(uncached, lang);
+  const ok = await fetchTranslations(uncached, lang);
 
   // Guard: discard if user switched again while we were waiting
   if (seq !== translationSeq) return;
+
+  if (!ok) {
+    setStatus('customer-products-status', 'Translation failed — check that GOOGLE_TRANSLATE_API_KEY is set and the Cloud Translation API is enabled in your Google Cloud project.', 'error');
+    return;
+  }
 
   document.querySelectorAll('[data-i18n]').forEach((el) => {
     el.textContent = t(el.dataset.i18n);
@@ -2214,7 +2221,7 @@ function attachCustomerEventHandlers() {
       setCustomerAccessibilityPanelOpen(false);
     }
   });
-  document.getElementById('customer-contrast-toggle').addEventListener('click', () => {
+  document.getElementById('customer-contrast-toggle')?.addEventListener('click', () => {
     setCustomerContrastPreference(!customerState.highContrast);
   });
   document.getElementById('customer-text-size')?.addEventListener('change', (event) => {
