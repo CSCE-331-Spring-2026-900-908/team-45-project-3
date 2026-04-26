@@ -74,13 +74,29 @@ function t(text) {
   return translationCache[`${currentLang}:${text}`] || text;
 }
 
+const JS_STATIC_STRINGS = [
+  'No rewards profile yet',
+  'Sign in or create an account to count orders toward a free drink.',
+  '0 of 5 orders completed',
+  'of 5 orders completed toward next reward',
+  'more order until the next free drink.',
+  'more orders until the next free drink.',
+  'You have 1 free drink credit ready to use on your next order!',
+  'You have',
+  'free drink credits ready to use!',
+  'item available',
+  'items available',
+  'No products are available in this category right now.',
+  'Your cart is empty. Pick a drink to customize and add it here.',
+];
+
 function collectAllTranslatableStrings() {
   const staticTexts = Array.from(document.querySelectorAll('[data-i18n]'))
     .map((el) => el.dataset.i18n)
     .filter(Boolean);
   const productTexts = customerState.products.flatMap((p) => [p.name, p.category]);
   const categoryTexts = Object.values(CUSTOMER_CATEGORY_META).flatMap((m) => [m.label, m.description]);
-  return [...new Set([...staticTexts, ...productTexts, ...categoryTexts])].filter(Boolean);
+  return [...new Set([...staticTexts, ...productTexts, ...categoryTexts, ...JS_STATIC_STRINGS])].filter(Boolean);
 }
 
 async function fetchTranslations(texts, lang) {
@@ -114,6 +130,8 @@ async function applyLanguage(lang) {
     });
     renderCustomerCategoryButtons();
     renderCustomerProducts();
+    renderCustomerRewards();
+    renderCustomerCart();
     return;
   }
 
@@ -136,6 +154,8 @@ async function applyLanguage(lang) {
   });
   renderCustomerCategoryButtons();
   renderCustomerProducts();
+  renderCustomerRewards();
+  renderCustomerCart();
 
   // After rendering, silently prefetch the other languages in the background
   if (!bgPrefetchDone) {
@@ -1856,9 +1876,9 @@ function renderCustomerRewards() {
   const idLine = document.getElementById('customer-rewards-id');
 
   if (!customerState.profile) {
-    heading.textContent = 'No rewards profile yet';
-    copy.textContent = 'Sign in or create an account to count orders toward a free drink.';
-    meta.textContent = '0 of 5 orders completed';
+    heading.textContent = t('No rewards profile yet');
+    copy.textContent = t('Sign in or create an account to count orders toward a free drink.');
+    meta.textContent = t('0 of 5 orders completed');
     bar.style.width = '0%';
     if (idLine) idLine.textContent = '';
     setFieldValue('customer-phone', '');
@@ -1872,13 +1892,13 @@ function renderCustomerRewards() {
 
   if (credits > 0) {
     copy.textContent = credits === 1
-      ? 'You have 1 free drink credit ready to use on your next order!'
-      : `You have ${credits} free drink credits ready to use!`;
+      ? t('You have 1 free drink credit ready to use on your next order!')
+      : `${t('You have')} ${credits} ${t('free drink credits ready to use!')}`;
   } else {
-    copy.textContent = `${reward.ordersUntilReward} more order${reward.ordersUntilReward === 1 ? '' : 's'} until the next free drink.`;
+    copy.textContent = `${reward.ordersUntilReward} ${reward.ordersUntilReward === 1 ? t('more order until the next free drink.') : t('more orders until the next free drink.')}`;
   }
 
-  meta.textContent = `${reward.progress} of 5 orders completed toward next reward`;
+  meta.textContent = `${reward.progress} ${t('of 5 orders completed toward next reward')}`;
   bar.style.width = `${(reward.progress / 5) * 100}%`;
 
   if (idLine) {
@@ -1952,11 +1972,11 @@ function renderCustomerProducts() {
 
   setText('customer-active-category', t(meta.label));
   setText('customer-category-description', t(meta.description));
-  setText('customer-product-count', `${visible.length} item${visible.length === 1 ? '' : 's'} available`);
+  setText('customer-product-count', `${visible.length} ${visible.length === 1 ? t('item available') : t('items available')}`);
 
   container.innerHTML = '';
   if (!visible.length) {
-    container.innerHTML = '<p class="muted-line">No products are available in this category right now.</p>';
+    container.innerHTML = `<p class="muted-line">${escapeHtml(t('No products are available in this category right now.'))}</p>`;
     return;
   }
 
@@ -1989,7 +2009,7 @@ function renderCustomerCart() {
   container.innerHTML = '';
 
   if (!customerState.cart.length) {
-    container.innerHTML = '<p class="muted-line">Your cart is empty. Pick a drink to customize and add it here.</p>';
+    container.innerHTML = `<p class="muted-line">${escapeHtml(t('Your cart is empty. Pick a drink to customize and add it here.'))}</p>`;
   } else {
     customerState.cart.forEach((line, index) => {
       const row = document.createElement('article');
