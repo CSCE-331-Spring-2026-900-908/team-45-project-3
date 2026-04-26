@@ -503,12 +503,20 @@ function toOrderPayload(line) {
 
 function buildPaymentPayload() {
   const total = Number(staffState.preview.total || 0);
-  const giftAmount = Number(document.getElementById('staff-gift-amount').value || 0);
-  const cashReceived = Number(document.getElementById('staff-cash-received').value || 0);
-  const primary = document.getElementById('staff-payment-primary').value;
-  const secondary = document.getElementById('staff-payment-secondary').value || null;
+
+  // Safely get values with fallbacks to avoid crashes
+  const giftEl = document.getElementById('staff-gift-amount');
+  const cashEl = document.getElementById('staff-cash-received');
+  const primaryEl = document.getElementById('staff-payment-primary');
+  const secondaryEl = document.getElementById('staff-payment-secondary');
+
+  const giftAmount = Number(giftEl?.value || 0);
+  const cashReceived = Number(cashEl?.value || 0);
+  const primary = primaryEl?.value || 'Cash';
+  const secondary = secondaryEl?.value || null;
+
   const remainingAfterGift = Math.max(0, total - giftAmount);
-  const cashChange = primary === 'Cash' || secondary === 'Cash'
+  const cashChange = (primary === 'Cash' || secondary === 'Cash')
     ? Math.max(0, cashReceived - remainingAfterGift)
     : 0;
 
@@ -521,7 +529,6 @@ function buildPaymentPayload() {
     totalAmount: total,
   };
 }
-
 async function bootPortal() {
   attachPortalEntryHandlers();
   const data = await fetchJson('/api/portal');
@@ -530,167 +537,148 @@ async function bootPortal() {
 }
 
 async function bootStaff() {
-  // 1. Check for local session
+  // 1. Session check
   let session = getRoleSession();
-
-  // 2. Check for Google OAuth session if no local session exists
   if (!session) {
     try {
       const status = await fetchJson('/api/auth/status');
-      // Staff login allows both 'staff' and 'manager' roles to enter
       if (status.authenticated && (status.role === 'staff' || status.role === 'manager')) {
         session = status;
         saveRoleSession(session);
       }
-    } catch (e) {
-      console.log("No active Google session for staff.");
-    }
+    } catch (e) { console.log("No OAuth session."); }
   }
 
-  // 3. Unlock workspace if authenticated
   if (session && (session.role === 'staff' || session.role === 'manager')) {
     showStaffWorkspace(session);
     await loadStaffProducts();
   }
 
-  // 4. Manual Login Form Handler (PIN logic)
-  const form = document.getElementById('staff-login-form');
+  // 2. PIN Keypad Logic
   const loginForm = document.getElementById('staff-login-form');
   const pinInput = loginForm.querySelector('input[name="pin"]');
 
   loginForm.querySelectorAll('.keypad-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      if (pinInput.value.length < 4) {
-        pinInput.value += btn.dataset.val;
-      }
-    });
+    btn.onclick = () => {
+      if (pinInput.value.length < 4) pinInput.value += btn.dataset.val;
+    };
   });
 
-  loginForm.querySelector('.keypad-clear').addEventListener('click', () => {
+  loginForm.querySelector('.keypad-clear').onclick = () => {
     pinInput.value = '';
     setStatus('staff-login-status', 'PIN cleared.', 'neutral');
-  });
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    setStatus('staff-login-status', 'Authenticating PIN...', 'neutral');
-    const formData = new FormData(form);
-    const pin = formData.get('pin');
+  };
 
-    if (pin.length !== 4) {
-      setStatus('staff-login-status', 'Please enter a 4-digit PIN.', 'error');
-      return;
-    }
+  // 3. Login Submit
+  loginForm.onsubmit = async (event) => {
+    event.preventDefault();
+    const pin = pinInput.value;
+    if (pin.length !== 4) return setStatus('staff-login-status', 'Enter 4 digits.', 'error');
 
     try {
       const result = await fetchJson('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin: pin }) // Fixed variable name
+        body: JSON.stringify({ pin })
       });
-
       if (result.authenticated) {
         saveRoleSession(result);
         showStaffWorkspace(result);
         await loadStaffProducts();
-        setStatus('staff-login-status', `Signed in as ${result.name || 'Staff'}.`, 'success');
       } else {
         setStatus('staff-login-status', 'Invalid PIN.', 'error');
       }
-    } catch (error) {
-      setStatus('staff-login-status', 'Authentication failed. Please try again.', 'error');
-    }
-  });
-  // 5. Sign Out & Navigation
-  document.getElementById('staff-sign-out').addEventListener('click', () => {
-    // 1. Clear the session from storage
-    clearRoleSession();
+    } catch (error) { setStatus('staff-login-status', 'Login failed.', 'error'); }
+  };
 
-    // 2. Reset the internal staff state (Cart, Products, etc.)
-    staffState.cart = [];
-    staffState.products = [];
-    staffState.selectedProductId = null;
-    staffState.preview = { ...EMPTY_PREVIEW };
-
-    // 3. Reset the UI elements
-    document.getElementById('staff-workspace').hidden = true; // Hide the dashboard
-    document.getElementById('staff-login-card').hidden = false; // Show the PIN entry
-
-    // Clear the PIN input field specifically
-    const pinInput = document.querySelector('#staff-login-form [name="pin"]');
-    if (pinInput) {
-      pinInput.value = '';
-    }
-
-    setStatus('staff-login-status', 'Signed out successfully.', 'neutral');
-  });
-
-  // 6. UI Interaction Handlers
-  document.getElementById('staff-sugar').addEventListener('input', (event) => {
-    setText('staff-sugar-value', `${event.target.value}%`);
-  });
-
-  document.getElementById('staff-add-to-cart').addEventListener('click', async () => {
+  // 4. Order Actions
+  document.getElementById('staff-add-to-cart').onclick = async () => {
     const product = getSelectedProduct();
-    if (!product) {
-      setStatus('staff-cart-status', 'Select a product before adding to the cart.', 'error');
-      return;
-    }
-    if (product.outOfStock) {
-      setStatus('staff-cart-status', `${product.name} is out of stock right now.`, 'error');
-      return;
-    }
+    if (!product) return setStatus('staff-cart-status', 'Select a product first!', 'error');
+
     const customization = readCustomizationForm();
-    const existing = staffState.cart.find((line) => line.productId === product.id && customizationMatches(line, customization));
-    if (existing) {
-      existing.quantity += customization.quantity;
-      existing.lineTotal = Number((existing.unitPrice * existing.quantity).toFixed(2));
+
+    // 1. Check if an identical item already exists in the cart
+    const existingItem = staffState.cart.find(item =>
+      item.productId === product.id &&
+      item.size === customization.size &&
+      item.sugarPercent === customization.sugarPercent &&
+      JSON.stringify(item.toppings.sort()) === JSON.stringify(customization.toppings.sort())
+    );
+
+    if (existingItem) {
+      // 2. Update existing item Qty and Total
+      existingItem.quantity += customization.quantity;
+      existingItem.lineTotal = Number((existingItem.unitPrice * existingItem.quantity).toFixed(2));
+      setStatus('staff-cart-status', `Updated ${product.name} quantity.`, 'success');
     } else {
+      // 3. Add as a new block if it's different
       staffState.cart.push({
+        ...product,
         productId: product.id,
-        name: product.name,
-        category: product.category,
-        quantity: customization.quantity,
-        size: customization.size,
-        sugarPercent: customization.sugarPercent,
-        toppings: customization.toppings,
+        ...customization,
         unitPrice: Number(product.price),
         lineTotal: Number((Number(product.price) * customization.quantity).toFixed(2)),
       });
+      setStatus('staff-cart-status', `Added ${product.name} to cart.`, 'success');
     }
-    resetCustomizationForm();
+
+    // 4. Refresh UI
     renderCart();
     await refreshPreview();
-  });
 
-  document.getElementById('staff-preview-order').addEventListener('click', refreshPreview);
-  document.getElementById('staff-submit-order').addEventListener('click', async () => {
-    if (!staffState.cart.length || staffState.isSubmittingOrder) return;
-    staffState.isSubmittingOrder = true;
-    const submitButton = document.getElementById('staff-submit-order');
-    if (submitButton) {
-      submitButton.disabled = true;
+    // Optional: reset form to defaults after adding
+    resetCustomizationForm();
+  };
+
+  document.getElementById('staff-submit-order').onclick = async () => {
+    if (!staffState.cart.length) {
+      setStatus('staff-checkout-status', 'Cart is empty!', 'error');
+      return;
     }
+
     try {
+      const payload = {
+        items: staffState.cart.map(toOrderPayload),
+        payment: buildPaymentPayload()
+      };
+
+      setStatus('staff-checkout-status', 'Processing payment...', 'neutral');
+
       await fetchJson('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: staffState.cart.map(toOrderPayload), payment: buildPaymentPayload() }),
+        body: JSON.stringify(payload),
       });
+
+      // 1. Show Success Message on Page
+      setStatus('staff-checkout-status', '✔ Order placed successfully!', 'success');
+
+      // 2. Reset State
       staffState.cart = [];
       staffState.preview = { ...EMPTY_PREVIEW };
-      await loadStaffProducts();
       renderCart();
       renderPreview();
-      setStatus('staff-preview-status', 'Order submitted successfully.', 'success');
+
+      // 3. Clear the success message after 4 seconds
+      setTimeout(() => {
+        setStatus('staff-checkout-status', '', 'neutral');
+      }, 4000);
+
     } catch (error) {
-      setStatus('staff-preview-status', error.message, 'error');
-    } finally {
-      staffState.isSubmittingOrder = false;
-      if (submitButton) {
-        submitButton.disabled = false;
-      }
+      console.error("Submission error:", error);
+      setStatus('staff-checkout-status', 'Error: ' + error.message, 'error');
     }
-  });
+  };
+  document.getElementById('staff-sign-out').onclick = () => {
+    clearRoleSession();
+    location.reload(); // Simplest way to reset everything
+  };
+
+  // UI sugar level display
+  document.getElementById('staff-sugar').oninput = (e) => {
+    setText('staff-sugar-value', `${e.target.value}%`);
+  };
 }
 
 function showStaffWorkspace(session) {
