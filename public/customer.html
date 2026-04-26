@@ -74,38 +74,59 @@
             </div>
 
             <div class="customer-account-grid">
-              <form id="customer-login-form" class="auth-form compact-auth-form" autocomplete="on">
-                <label>
-                  <span data-i18n="Rewards phone number">Rewards phone number</span>
+              <div class="customer-numpad-panel">
+                <p class="customer-numpad-label" data-i18n="Rewards phone number">Rewards phone number</p>
+                <div class="customer-phone-display-wrap">
                   <input
                     id="customer-phone"
                     name="phoneNumber"
+                    form="customer-login-form"
                     type="tel"
-                    inputmode="numeric"
+                    inputmode="none"
                     autocomplete="tel"
                     maxlength="14"
                     placeholder="(555) 123-4567"
                     required
+                    readonly
+                    class="customer-phone-display"
                   />
-                </label>
-                <div class="button-row customer-login-actions">
+                </div>
+                <div class="customer-numpad" aria-label="Phone number keypad">
+                  <button type="button" class="customer-numpad-key" data-digit="1">1</button>
+                  <button type="button" class="customer-numpad-key" data-digit="2">2</button>
+                  <button type="button" class="customer-numpad-key" data-digit="3">3</button>
+                  <button type="button" class="customer-numpad-key" data-digit="4">4</button>
+                  <button type="button" class="customer-numpad-key" data-digit="5">5</button>
+                  <button type="button" class="customer-numpad-key" data-digit="6">6</button>
+                  <button type="button" class="customer-numpad-key" data-digit="7">7</button>
+                  <button type="button" class="customer-numpad-key" data-digit="8">8</button>
+                  <button type="button" class="customer-numpad-key" data-digit="9">9</button>
+                  <button type="button" class="customer-numpad-key customer-numpad-clear" data-digit="clear" data-i18n="Clear">Clear</button>
+                  <button type="button" class="customer-numpad-key" data-digit="0">0</button>
+                  <button type="button" class="customer-numpad-key customer-numpad-back" data-digit="back" aria-label="Backspace">⌫</button>
+                </div>
+                <form id="customer-login-form" class="customer-numpad-actions" autocomplete="on">
                   <button id="customer-login" class="action-button" type="submit" data-i18n="Sign In">Sign In</button>
                   <button id="customer-register" class="ghost-button" type="button" data-i18n="Create Account">Create Account</button>
                   <button id="customer-logout" class="ghost-button" type="button" data-i18n="Sign Out">Sign Out</button>
-                </div>
-              </form>
+                </form>
+              </div>
 
               <section class="customer-rewards-card" aria-labelledby="customer-rewards-heading">
-                <p class="section-label" data-i18n="Rewards Status">Rewards Status</p>
+                <div class="customer-rewards-card-top">
+                  <p class="customer-rewards-card-label" data-i18n="Rewards">Rewards</p>
+                  <span class="customer-rewards-badge" aria-hidden="true">🧋</span>
+                </div>
                 <h3 id="customer-rewards-heading">No rewards profile yet</h3>
-                <p id="customer-rewards-id" class="muted-line" style="font-size:0.8em;opacity:0.7;"></p>
-                <p id="customer-rewards-copy" class="muted-line">
+                <p id="customer-rewards-id" class="customer-rewards-id-line"></p>
+                <p id="customer-rewards-copy" class="customer-rewards-copy">
                   Sign in or create an account to count orders toward a free drink.
                 </p>
+                <div id="customer-rewards-stamps" class="customer-rewards-stamps" aria-hidden="true"></div>
                 <div class="customer-rewards-progress" aria-hidden="true">
                   <div id="customer-rewards-bar" class="customer-rewards-progress-bar"></div>
                 </div>
-                <p id="customer-rewards-meta" class="muted-line">0 of 5 orders completed toward next reward</p>
+                <p id="customer-rewards-meta" class="customer-rewards-meta">0 of 5 orders completed</p>
               </section>
             </div>
           </section>

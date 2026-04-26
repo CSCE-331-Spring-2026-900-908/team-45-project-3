@@ -75,6 +75,7 @@ function t(text) {
 }
 
 const JS_STATIC_STRINGS = [
+  'Member ID:',
   'No rewards profile yet',
   'Sign in or create an account to count orders toward a free drink.',
   '0 of 5 orders completed',
@@ -1717,12 +1718,11 @@ function setCustomerContrastPreference(enabled) {
 
 function setCustomerTextScale(scale) {
   customerState.textScale = scale;
-  document.documentElement.style.setProperty('--customer-text-scale', String(scale));
+  // Set on <html> so all rem-based sizes on the page scale uniformly
+  document.documentElement.style.fontSize = scale === 1 ? '' : `${scale * 100}%`;
   localStorage.setItem(CUSTOMER_TEXT_SIZE_KEY, String(scale));
   const select = document.getElementById('customer-text-size');
-  if (select) {
-    select.value = String(scale);
-  }
+  if (select) select.value = String(scale);
 }
 
 function setCustomerZoomScale(scale) {
@@ -1856,6 +1856,14 @@ function restoreCustomerDialogFocus() {
   document.querySelector('.customer-category-button.active, .customer-product-tile')?.focus();
 }
 
+function renderRewardStamps(filledCount) {
+  const stampsEl = document.getElementById('customer-rewards-stamps');
+  if (!stampsEl) return;
+  stampsEl.innerHTML = Array.from({ length: 5 }, (_, i) =>
+    `<span class="customer-stamp${i < filledCount ? ' customer-stamp-filled' : ''}"></span>`
+  ).join('');
+}
+
 function renderCustomerRewards() {
   const heading = document.getElementById('customer-rewards-heading');
   const copy = document.getElementById('customer-rewards-copy');
@@ -1868,6 +1876,7 @@ function renderCustomerRewards() {
     copy.textContent = t('Sign in or create an account to count orders toward a free drink.');
     meta.textContent = t('0 of 5 orders completed');
     bar.style.width = '0%';
+    renderRewardStamps(0);
     if (idLine) idLine.textContent = '';
     setFieldValue('customer-phone', '');
     return;
@@ -1888,10 +1897,11 @@ function renderCustomerRewards() {
 
   meta.textContent = `${reward.progress} ${t('of 5 orders completed toward next reward')}`;
   bar.style.width = `${(reward.progress / 5) * 100}%`;
+  renderRewardStamps(reward.progress);
 
   if (idLine) {
     idLine.textContent = customerState.profile.customerId != null
-      ? `Member ID: #${customerState.profile.customerId}`
+      ? `${t('Member ID:')} #${customerState.profile.customerId}`
       : '';
   }
 
@@ -2252,6 +2262,24 @@ function attachCustomerEventHandlers() {
   });
   document.getElementById('customer-phone')?.addEventListener('input', (event) => {
     event.target.value = formatCustomerPhoneNumber(event.target.value);
+  });
+
+  document.querySelector('.customer-numpad')?.addEventListener('click', (event) => {
+    const key = event.target.closest('[data-digit]');
+    if (!key) return;
+    const input = document.getElementById('customer-phone');
+    const digits = normalizeCustomerPhoneNumber(input.value);
+    const digit = key.dataset.digit;
+    let newDigits;
+    if (digit === 'back') {
+      newDigits = digits.slice(0, -1);
+    } else if (digit === 'clear') {
+      newDigits = '';
+    } else {
+      if (digits.length >= CUSTOMER_PHONE_NUMBER_LENGTH) return;
+      newDigits = digits + digit;
+    }
+    input.value = formatCustomerPhoneNumber(newDigits);
   });
 
   document.getElementById('customer-login-form').addEventListener('submit', async (event) => {
