@@ -77,6 +77,8 @@ function t(text) {
 const JS_STATIC_STRINGS = [
   'Member ID:',
   'No rewards profile yet',
+  'Ask about the menu\u2026',
+  'Hi! I\'m your Reveille Bubble Tea assistant. Ask me anything about the menu, customizations, or our rewards program!',
   'Sign in or create an account to count orders toward a free drink.',
   '0 of 5 orders completed',
   'of 5 orders completed toward next reward',
@@ -129,6 +131,8 @@ async function applyLanguage(lang) {
     document.querySelectorAll('[data-i18n]').forEach((el) => {
       el.textContent = el.dataset.i18n;
     });
+    const chatInput = document.getElementById('chat-input');
+    if (chatInput) chatInput.placeholder = 'Ask about the menu\u2026';
     renderCustomerCategoryButtons();
     renderCustomerProducts();
     renderCustomerRewards();
@@ -153,6 +157,8 @@ async function applyLanguage(lang) {
   document.querySelectorAll('[data-i18n]').forEach((el) => {
     el.textContent = t(el.dataset.i18n);
   });
+  const chatInput = document.getElementById('chat-input');
+  if (chatInput) chatInput.placeholder = t('Ask about the menu\u2026');
   renderCustomerCategoryButtons();
   renderCustomerProducts();
   renderCustomerRewards();
@@ -2561,7 +2567,7 @@ function openChatWidget() {
   // Show a greeting on first open
   const container = document.getElementById('chat-messages');
   if (container && !container.children.length) {
-    appendChatBubble('assistant', 'Hi! I\'m your Reveille Bubble Tea assistant. Ask me anything about the menu, customizations, or our rewards program!');
+    appendChatBubble('assistant', t('Hi! I\'m your Reveille Bubble Tea assistant. Ask me anything about the menu, customizations, or our rewards program!'));
   }
 
   document.getElementById('chat-input')?.focus();

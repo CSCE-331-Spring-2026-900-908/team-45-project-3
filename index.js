@@ -487,7 +487,8 @@ function createApp() {
 
     const systemPrompt =
       'You are a friendly and helpful assistant for 12th Man Tea, a boba tea shop. ' +
-      'Your job is to help customers with menu information, drink recommendations, and ordering guidance.\n\n' +
+      'Your job is to help customers with menu information, drink recommendations, and ordering guidance. ' +
+      'Always respond in the same language the customer is writing in.\n\n' +
       `Current menu:\n${menuText}\n\n` +
       'Drink customization options:\n' +
       '  • Size: Small, Medium, or Large\n' +
