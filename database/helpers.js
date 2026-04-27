@@ -39,7 +39,7 @@ function normalizeSize(size) {
 
 function normalizePercent(value, fallback = 100) {
   const number = Number(value);
-  return clamp(Number.isFinite(number) ? number : fallback, 0, 100);
+  return clamp(Number.isFinite(number) ? number : fallback, 0, 200);
 }
 
 function applySizePriceDelta(basePrice, size) {

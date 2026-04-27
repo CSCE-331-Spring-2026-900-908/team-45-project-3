@@ -1816,12 +1816,15 @@ function getCustomerRewardDiscount() {
 function readCustomerCustomizationForm() {
   const sizeField = document.querySelector('input[name="customer-size"]:checked');
   const sugarField = document.querySelector('input[name="customer-sugar"]:checked');
-  const iceField = document.querySelector('input[name="customer-ice"]:checked');
+  // Add the ice field reader
+  const iceField = document.querySelector('input[name="customer-ice"]:checked'); 
+
   return {
     quantity: Math.max(1, Number(document.getElementById('customer-qty').value) || 1),
     size: sizeField ? sizeField.value : 'Medium',
     sugarPercent: sugarField ? Number(sugarField.value) : 50,
-    icePercent: iceField ? Number(iceField.value) : 50,
+    // Safely read the ice value, default to 50
+    icePercent: iceField ? Number(iceField.value) : 50, 
     toppings: Array.from(document.querySelectorAll('input[name="customer-topping"]:checked')).map((element) => element.value),
   };
 }
@@ -1830,7 +1833,10 @@ function resetCustomerCustomizationForm() {
   document.getElementById('customer-qty').value = '1';
   document.querySelector('input[name="customer-size"][value="Medium"]').checked = true;
   document.querySelector('input[name="customer-sugar"][value="50"]').checked = true;
-  document.querySelector('input[name="customer-ice"][value="50"]').checked = true;
+  
+  // Add this line to reset the ice back to 50% when the dialog closes
+  document.querySelector('input[name="customer-ice"][value="50"]').checked = true; 
+  
   document.querySelectorAll('input[name="customer-topping"]').forEach((element) => {
     element.checked = false;
   });

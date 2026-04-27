@@ -82,7 +82,7 @@ function createApp() {
 
   // 1. Session setup
   app.use(session({
-    secret: process.env.SESSION_SECRET || 'howdy_aggies_secret', 
+    secret: process.env.SESSION_SECRET || 'howdy_aggies_secret',
     resave: false,
     saveUninitialized: false
   }));
@@ -93,17 +93,17 @@ function createApp() {
 
   // 3. Configure Google Strategy
   passport.use(new GoogleStrategy({
-      clientID: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: "/auth/google/callback"
-    },
+    clientID: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    callbackURL: "/auth/google/callback"
+  },
     async (accessToken, refreshToken, profile, done) => {
       const email = profile.emails[0].value;
       try {
         // Use the 'query' function from your database client directly
-        const { query } = require('./database/client'); 
+        const { query } = require('./database/client');
         const { rows } = await query("SELECT * FROM employees WHERE username = $1", [email]);
-        
+
         if (rows.length > 0) {
           return done(null, rows[0]);
         } else {
@@ -137,7 +137,7 @@ function createApp() {
   // --- Google Auth API Routes ---
   app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 
-  app.get('/auth/google/callback', 
+  app.get('/auth/google/callback',
     passport.authenticate('google', { failureRedirect: '/' }),
     (req, res) => {
       // Success! Redirect to the page corresponding to their role (e.g., /manager)
@@ -157,7 +157,7 @@ function createApp() {
     }
 
     // Double check this line:
-    if (result && result.authenticated === true) { 
+    if (result && result.authenticated === true) {
       res.status(200).json(result);
     } else {
       res.status(401).json({ authenticated: false, message: "Login failed" });
@@ -492,7 +492,7 @@ function createApp() {
       `Current menu:\n${menuText}\n\n` +
       'Drink customization options:\n' +
       '  • Size: Small, Medium, or Large\n' +
-      '  • Sweetness: 0%, 25%, 50%, 75%, or 100%\n' +
+      '  • Sweetness: 0%, 25%, 50%, 75%, 100%, 125%, 150%, 175%, or 200%\n' +
       '  • Ice level: 0%, 25%, 50%, 75%, or 100%\n' +
       '  • Toppings: Boba, Crystal Boba, Lychee Jelly, Pudding\n\n' +
       'Rewards program: Customers earn 1 point per order. Every 5 orders earns 1 free drink credit ' +
