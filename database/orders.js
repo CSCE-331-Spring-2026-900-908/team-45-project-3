@@ -160,7 +160,7 @@ async function submitOrderWithPayment(items, payment = {}) {
     await decrementInventory(client, requiredIngredients);
     await ensureOrderPaymentsTable(client);
     await ensureReportingTables(client);
-
+    //ensure block is finished before moving on
     const normalizedPayment = normalizePayment(payment, preview.total);
     const paymentResult = await client.query(
       'INSERT INTO order_payments (order_start_id, order_end_id, total_amount, primary_payment_type, secondary_payment_type, gift_amount, cash_received, cash_change) ' +
@@ -199,7 +199,7 @@ async function submitOrderWithPayment(items, payment = {}) {
     };
   });
 }
-
+//Used to remove payments that have already been added
 async function voidPaymentById(paymentRecordId) {
   return withTransaction(async (client) => {
     await ensureOrderPaymentsTable(client);

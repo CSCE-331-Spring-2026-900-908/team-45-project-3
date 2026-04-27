@@ -164,7 +164,8 @@ async function applyLanguage(lang) {
   renderCustomerRewards();
   renderCustomerCart();
 
-  // After rendering, silently prefetch the other languages in the background
+
+  //Prefetches other translations to ensure seamless transitions
   if (!bgPrefetchDone) {
     bgPrefetchDone = true;
     const otherLangs = SUPPORTED_LANGUAGES
@@ -177,6 +178,7 @@ async function applyLanguage(lang) {
   }
 }
 
+
 const INVENTORY_CATEGORY_OPTIONS = [
   'Milk Flavor',
   'Tea Flavor',
@@ -185,7 +187,6 @@ const INVENTORY_CATEGORY_OPTIONS = [
   'Cup',
   'Lid',
 ];
-
 
 async function fetchJson(url, options = {}) {
   const response = await fetch(url, options);
@@ -242,7 +243,7 @@ function setText(id, value) {
   const element = document.getElementById(id);
   if (element) {
     element.textContent = value;
-  }
+  } //Important for setting text dynamically, used in translation feature
 }
 
 function setFieldValue(id, value) {

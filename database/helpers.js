@@ -7,7 +7,7 @@ function clamp(value, min, max) {
 
 function toMoney(value) {
   return Number.parseFloat(Number(value || 0).toFixed(2));
-}
+} // Used to fix decimal values to nearest cent denomination
 
 function mapAuthResult(row) {
   if (!row) {

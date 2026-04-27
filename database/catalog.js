@@ -174,7 +174,6 @@ async function addProductWithIngredients({ name, category, price, ingredientUsag
       'INSERT INTO products (id, name, category, price, active) VALUES ($1, $2, $3, $4, TRUE)',
       [productId, name.trim(), category.trim(), toMoney(price).toFixed(2)]
     );
-
     for (const entry of ingredientUsage) {
       const ingredientId = Number(entry.ingredientId);
       const quantityUsed = Number(entry.quantityUsed);
@@ -186,7 +185,6 @@ async function addProductWithIngredients({ name, category, price, ingredientUsag
         [productId, ingredientId, quantityUsed]
       );
     }
-
     return productId;
   });
 }
