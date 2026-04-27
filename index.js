@@ -493,6 +493,7 @@ function createApp() {
       'Drink customization options:\n' +
       '  • Size: Small, Medium, or Large\n' +
       '  • Sweetness: 0%, 25%, 50%, 75%, or 100%\n' +
+      '  • Ice level: 0%, 25%, 50%, 75%, or 100%\n' +
       '  • Toppings: Boba, Crystal Boba, Lychee Jelly, Pudding\n\n' +
       'Rewards program: Customers earn 1 point per order. Every 5 orders earns 1 free drink credit ' +
       '(the cheapest drink in the cart is free). Credits stack and are tracked automatically when signed in.\n\n' +

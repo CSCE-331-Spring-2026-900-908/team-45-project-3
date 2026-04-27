@@ -37,6 +37,11 @@ function normalizeSize(size) {
   return 'Medium';
 }
 
+function normalizePercent(value, fallback = 100) {
+  const number = Number(value);
+  return clamp(Number.isFinite(number) ? number : fallback, 0, 100);
+}
+
 function applySizePriceDelta(basePrice, size) {
   const price = toMoney(basePrice);
   if (size === 'Small') return toMoney(price - SIZE_PRICE_DELTA);
@@ -82,15 +87,21 @@ function isPackagingIngredient(name) {
 
 function normalizeOrderLines(items) {
   return (Array.isArray(items) ? items : [])
-    .map((item) => ({
-      productId: Number(item.productId),
-      quantity: Math.max(1, Number(item.quantity) || 1),
-      size: normalizeSize(item.size),
-      sugarPercent: clamp(Number(item.sugarPercent) || 100, 0, 100),
-      toppings: Array.isArray(item.toppings)
-        ? item.toppings.map((entry) => String(entry).trim()).filter(Boolean)
-        : [],
-    }))
+    .map((item) => {
+      const line = {
+        productId: Number(item.productId),
+        quantity: Math.max(1, Number(item.quantity) || 1),
+        size: normalizeSize(item.size),
+        sugarPercent: normalizePercent(item.sugarPercent, 100),
+        toppings: Array.isArray(item.toppings)
+          ? item.toppings.map((entry) => String(entry).trim()).filter(Boolean)
+          : [],
+      };
+      if (Object.prototype.hasOwnProperty.call(item, 'icePercent')) {
+        line.icePercent = normalizePercent(item.icePercent, 50);
+      }
+      return line;
+    })
     .filter((item) => Number.isInteger(item.productId));
 }
 
@@ -100,7 +111,7 @@ function buildLineSummary(line, product) {
   }
   const unitPrice = applySizePriceDelta(product.price, line.size);
   const lineTotal = toMoney(unitPrice * line.quantity);
-  return {
+  const summary = {
     productId: product.id,
     name: product.name,
     category: product.category,
@@ -111,6 +122,10 @@ function buildLineSummary(line, product) {
     unitPrice: toMoney(unitPrice),
     lineTotal,
   };
+  if (line.icePercent != null) {
+    summary.icePercent = line.icePercent;
+  }
+  return summary;
 }
 
 function buildPaymentBreakdown(payment, total) {

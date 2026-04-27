@@ -358,12 +358,18 @@ function resetCustomizationForm() {
 }
 
 function customizationMatches(a, b) {
-  return a.size === b.size && a.sugarPercent === b.sugarPercent && JSON.stringify(a.toppings) === JSON.stringify(b.toppings);
+  const aIceLevel = a.icePercent ?? null;
+  const bIceLevel = b.icePercent ?? null;
+  return a.size === b.size
+    && a.sugarPercent === b.sugarPercent
+    && aIceLevel === bIceLevel
+    && JSON.stringify(a.toppings) === JSON.stringify(b.toppings);
 }
 
 function customizationSummary(item) {
   const toppings = item.toppings.length ? `, ${item.toppings.join(', ')}` : '';
-  return `${item.size}, ${item.sugarPercent}% sugar${toppings}`;
+  const ice = item.icePercent == null ? '' : `, ${item.icePercent}% ice`;
+  return `${item.size}, ${item.sugarPercent}% sugar${ice}${toppings}`;
 }
 
 function getFirstAvailableProduct(products) {
@@ -500,13 +506,17 @@ async function refreshPreview() {
 }
 
 function toOrderPayload(line) {
-  return {
+  const payload = {
     productId: line.productId,
     quantity: line.quantity,
     size: line.size,
     sugarPercent: line.sugarPercent,
     toppings: line.toppings,
   };
+  if (line.icePercent != null) {
+    payload.icePercent = line.icePercent;
+  }
+  return payload;
 }
 
 function buildPaymentPayload() {
@@ -1801,10 +1811,12 @@ function getCustomerRewardDiscount() {
 function readCustomerCustomizationForm() {
   const sizeField = document.querySelector('input[name="customer-size"]:checked');
   const sugarField = document.querySelector('input[name="customer-sugar"]:checked');
+  const iceField = document.querySelector('input[name="customer-ice"]:checked');
   return {
     quantity: Math.max(1, Number(document.getElementById('customer-qty').value) || 1),
     size: sizeField ? sizeField.value : 'Medium',
     sugarPercent: sugarField ? Number(sugarField.value) : 50,
+    icePercent: iceField ? Number(iceField.value) : 50,
     toppings: Array.from(document.querySelectorAll('input[name="customer-topping"]:checked')).map((element) => element.value),
   };
 }
@@ -1813,6 +1825,7 @@ function resetCustomerCustomizationForm() {
   document.getElementById('customer-qty').value = '1';
   document.querySelector('input[name="customer-size"][value="Medium"]').checked = true;
   document.querySelector('input[name="customer-sugar"][value="50"]').checked = true;
+  document.querySelector('input[name="customer-ice"][value="50"]').checked = true;
   document.querySelectorAll('input[name="customer-topping"]').forEach((element) => {
     element.checked = false;
   });
@@ -2103,7 +2116,7 @@ function openCustomerDialog(productId) {
   }
   resetCustomerCustomizationForm();
   setText('customer-dialog-title', product.name);
-  setText('customer-dialog-price', `Base price ${formatCurrency(product.price)}. Adjust size, sweetness, and toppings.`);
+  setText('customer-dialog-price', `Base price ${formatCurrency(product.price)}. Adjust size, sweetness, ice, and toppings.`);
   const dialog = document.getElementById('customer-customize-dialog');
   if (typeof dialog.showModal === 'function') {
     dialog.showModal();
@@ -2145,6 +2158,7 @@ async function addCustomerSelectionToCart() {
       quantity: customization.quantity,
       size: customization.size,
       sugarPercent: customization.sugarPercent,
+      icePercent: customization.icePercent,
       toppings: customization.toppings,
       unitPrice: Number(product.price),
       lineTotal: Number((Number(product.price) * customization.quantity).toFixed(2)),
