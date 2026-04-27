@@ -16,7 +16,7 @@ const {
 } = require('./helpers');
 const { fetchProductsById } = require('./catalog');
 
-async function previewOrder(items) {
+async function previewOrder(items, discountAmount = 0) {
   const orderLines = normalizeOrderLines(items);
   if (!orderLines.length) {
     return emptyOrderPreview();
@@ -25,11 +25,13 @@ async function previewOrder(items) {
   const products = await fetchProductsById();
   const lineItems = orderLines.map((line) => buildLineSummary(line, products.get(line.productId))).filter(Boolean);
   const subtotal = toMoney(lineItems.reduce((sum, item) => sum + item.lineTotal, 0));
-  const tax = toMoney(subtotal * TAX_RATE);
-  const total = toMoney(subtotal + tax);
+  const discount = toMoney(Math.min(Math.max(0, Number(discountAmount) || 0), subtotal));
+  const taxableSubtotal = toMoney(Math.max(0, subtotal - discount));
+  const tax = toMoney(taxableSubtotal * TAX_RATE);
+  const total = toMoney(taxableSubtotal + tax);
   const shortages = await findInventoryShortages(orderLines);
 
-  return { lineItems, subtotal, tax, total, shortages, canSubmit: shortages.length === 0 && lineItems.length > 0 };
+  return { lineItems, subtotal, discount, tax, total, shortages, canSubmit: shortages.length === 0 && lineItems.length > 0 };
 }
 
 async function fetchProductAvailability() {
@@ -122,7 +124,8 @@ async function submitOrderWithPayment(items, payment = {}) {
       throw error;
     }
 
-    const preview = await previewOrder(orderLines);
+    const normalizedPayment = normalizePayment(payment, 0);
+    const preview = await previewOrder(orderLines, normalizedPayment.discountAmount);
     if (!preview.lineItems.length) {
       const error = new Error('No valid order items were submitted.');
       error.statusCode = 400;
@@ -161,7 +164,7 @@ async function submitOrderWithPayment(items, payment = {}) {
     await ensureOrderPaymentsTable(client);
     await ensureReportingTables(client);
     //ensure block is finished before moving on
-    const normalizedPayment = normalizePayment(payment, preview.total);
+    const normalizedPaymentWithTotal = normalizePayment(payment, preview.total);
     const paymentResult = await client.query(
       'INSERT INTO order_payments (order_start_id, order_end_id, total_amount, primary_payment_type, secondary_payment_type, gift_amount, cash_received, cash_change) ' +
       'VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id',
@@ -169,25 +172,26 @@ async function submitOrderWithPayment(items, payment = {}) {
         firstOrderId,
         nextOrderId - 1,
         preview.total.toFixed(2),
-        normalizedPayment.primaryPaymentType,
-        normalizedPayment.secondaryPaymentType,
-        normalizedPayment.giftAmount.toFixed(2),
-        normalizedPayment.cashReceived.toFixed(2),
-        normalizedPayment.cashChange.toFixed(2),
+        normalizedPaymentWithTotal.primaryPaymentType,
+        normalizedPaymentWithTotal.secondaryPaymentType,
+        normalizedPaymentWithTotal.giftAmount.toFixed(2),
+        normalizedPaymentWithTotal.cashReceived.toFixed(2),
+        normalizedPaymentWithTotal.cashChange.toFixed(2),
       ]
     );
 
-    const breakdown = buildPaymentBreakdown(normalizedPayment, preview.total);
+    const breakdown = buildPaymentBreakdown(normalizedPaymentWithTotal, preview.total);
     await client.query(
-      'UPDATE x_hourly_totals SET sales = sales + $2, tax = tax + $3, credit_card = credit_card + $4, debit_card = debit_card + $5, gift_card = gift_card + $6, cash = cash + $7 WHERE hour = $1',
+      'UPDATE x_hourly_totals SET sales = sales + $2, tax = tax + $3, credit_card = credit_card + $4, debit_card = debit_card + $5, gift_card = gift_card + $6, cash = cash + $7, discounts = discounts + $8 WHERE hour = $1',
       [
         now.getHours(),
-        preview.subtotal.toFixed(2),
+        toMoney(preview.subtotal - preview.discount).toFixed(2),
         preview.tax.toFixed(2),
         breakdown.creditCard.toFixed(2),
         breakdown.debitCard.toFixed(2),
         breakdown.giftCard.toFixed(2),
         breakdown.cash.toFixed(2),
+        preview.discount.toFixed(2),
       ]
     );
 

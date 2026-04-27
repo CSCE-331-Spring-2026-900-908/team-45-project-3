@@ -288,7 +288,7 @@ function createApp() {
   }));
 
   app.post('/api/orders/preview', asyncHandler(async (req, res) => {
-    res.json({ source: 'database', ...(await db.previewOrder(req.body?.items)) });
+    res.json({ source: 'database', ...(await db.previewOrder(req.body?.items, req.body?.discountAmount)) });
   }));
 
   // --- Write routes (require ENABLE_DB_WRITES=true) ---

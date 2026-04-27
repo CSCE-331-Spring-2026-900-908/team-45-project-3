@@ -142,6 +142,7 @@ function normalizePayment(payment, total) {
     primaryPaymentType: String(payment.primaryPaymentType || payment.primary || 'Cash'),
     secondaryPaymentType: payment.secondaryPaymentType || payment.secondary || null,
     giftAmount: toMoney(payment.giftAmount),
+    discountAmount: toMoney(payment.discountAmount),
     cashReceived: toMoney(payment.cashReceived),
     cashChange: toMoney(payment.cashChange),
     totalAmount: toMoney(payment.totalAmount || total),

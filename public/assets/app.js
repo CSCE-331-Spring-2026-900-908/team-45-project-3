@@ -2042,7 +2042,7 @@ function renderCustomerCart() {
   setText('customer-subtotal', formatCurrency(customerState.preview.subtotal));
   setText('customer-tax', formatCurrency(customerState.preview.tax));
   setText('customer-discount', customerState.rewardDiscount > 0 ? `-${formatCurrency(customerState.rewardDiscount)}` : formatCurrency(0));
-  setText('customer-total', formatCurrency(Math.max(0, Number(customerState.preview.total || 0) - customerState.rewardDiscount)));
+  setText('customer-total', formatCurrency(customerState.preview.total));
 
   const rewardBanner = document.getElementById('customer-reward-banner');
   const credits = customerState.profile ? (customerState.profile.freeDrinkCredits || 0) : 0;
@@ -2064,16 +2064,28 @@ async function refreshCustomerPreview() {
   }
 
   setStatus('customer-cart-status', 'Refreshing cart totals...', 'neutral');
-  const preview = await fetchJson('/api/orders/preview', {
+  const basePreview = await fetchJson('/api/orders/preview', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ items: customerState.cart.map(toOrderPayload) }),
   });
-  customerState.preview = preview;
-  if (Array.isArray(preview.lineItems) && preview.lineItems.length === customerState.cart.length) {
-    customerState.cart = preview.lineItems.map((line) => ({ ...line }));
+  customerState.preview = basePreview;
+  if (Array.isArray(basePreview.lineItems) && basePreview.lineItems.length === customerState.cart.length) {
+    customerState.cart = basePreview.lineItems.map((line) => ({ ...line }));
   }
   customerState.rewardDiscount = getCustomerRewardDiscount();
+
+  if (customerState.rewardDiscount > 0) {
+    customerState.preview = await fetchJson('/api/orders/preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        items: customerState.cart.map(toOrderPayload),
+        discountAmount: customerState.rewardDiscount,
+      }),
+    });
+  }
+
   renderCustomerCart();
   setStatus('customer-cart-status', 'Cart totals are up to date.', 'success');
 }
@@ -2170,10 +2182,11 @@ async function handleCustomerCheckout() {
           payment: {
             primaryPaymentType: 'Credit Card',
             secondaryPaymentType: null,
-            giftAmount: customerState.rewardDiscount,
+            giftAmount: 0,
+            discountAmount: customerState.rewardDiscount,
             cashReceived: 0,
             cashChange: 0,
-            totalAmount: Math.max(0, Number(customerState.preview.total || 0) - customerState.rewardDiscount),
+            totalAmount: Number(customerState.preview.total || 0),
           },
         }),
       });
@@ -2302,7 +2315,11 @@ function attachCustomerEventHandlers() {
       saveCustomerProfile(result.profile);
       renderCustomerRewards();
       customerState.rewardDiscount = getCustomerRewardDiscount();
-      renderCustomerCart();
+      if (customerState.cart.length) {
+        await refreshCustomerPreview();
+      } else {
+        renderCustomerCart();
+      }
       setStatus('customer-cart-status', 'Rewards account signed in.', 'success');
     } catch (error) {
       setStatus('customer-cart-status', error.message || 'Unable to sign in to rewards.', 'error');
@@ -2321,7 +2338,11 @@ function attachCustomerEventHandlers() {
       saveCustomerProfile(result.profile);
       renderCustomerRewards();
       customerState.rewardDiscount = getCustomerRewardDiscount();
-      renderCustomerCart();
+      if (customerState.cart.length) {
+        await refreshCustomerPreview();
+      } else {
+        renderCustomerCart();
+      }
       setStatus('customer-cart-status', 'Rewards account created and signed in.', 'success');
     } catch (error) {
       setStatus('customer-cart-status', error.message || 'Unable to create rewards account.', 'error');
@@ -2336,7 +2357,11 @@ function attachCustomerEventHandlers() {
     clearCustomerProfile();
     renderCustomerRewards();
     customerState.rewardDiscount = getCustomerRewardDiscount();
-    renderCustomerCart();
+    if (customerState.cart.length) {
+      await refreshCustomerPreview();
+    } else {
+      renderCustomerCart();
+    }
     setStatus('customer-cart-status', 'Signed out of the rewards account.', 'neutral');
   });
 
