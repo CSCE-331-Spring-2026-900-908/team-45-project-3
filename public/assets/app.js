@@ -330,7 +330,7 @@ function escapeHtml(value) {
 }
 
 function defaultCustomization() {
-  return { quantity: 1, size: 'Medium', sugarPercent: 100, toppings: [] };
+  return { quantity: 1, size: 'Medium', sugarPercent: 100, icePercent: 100, toppings: [] };
 }
 
 function getSelectedProduct() {
@@ -342,6 +342,7 @@ function readCustomizationForm() {
     quantity: Math.max(1, Number(document.getElementById('staff-qty').value) || 1),
     size: document.getElementById('staff-size').value,
     sugarPercent: Number(document.getElementById('staff-sugar').value) || 100,
+    icePercent: Number(document.getElementById('staff-ice').value) || 100,
     toppings: Array.from(document.querySelectorAll('input[name="staff-topping"]:checked')).map((element) => element.value),
   };
 }
@@ -350,26 +351,28 @@ function resetCustomizationForm() {
   const defaults = defaultCustomization();
   document.getElementById('staff-qty').value = defaults.quantity;
   document.getElementById('staff-size').value = defaults.size;
+  
   document.getElementById('staff-sugar').value = defaults.sugarPercent;
   setText('staff-sugar-value', `${defaults.sugarPercent}%`);
+  
+  document.getElementById('staff-ice').value = defaults.icePercent;
+  setText('staff-ice-value', `${defaults.icePercent}%`);
+  
   document.querySelectorAll('input[name="staff-topping"]').forEach((element) => {
     element.checked = false;
   });
 }
 
 function customizationMatches(a, b) {
-  const aIceLevel = a.icePercent ?? null;
-  const bIceLevel = b.icePercent ?? null;
-  return a.size === b.size
-    && a.sugarPercent === b.sugarPercent
-    && aIceLevel === bIceLevel
-    && JSON.stringify(a.toppings) === JSON.stringify(b.toppings);
+  return a.size === b.size && 
+         a.sugarPercent === b.sugarPercent && 
+         a.icePercent === b.icePercent && 
+         JSON.stringify(a.toppings.sort()) === JSON.stringify(b.toppings.sort());
 }
 
 function customizationSummary(item) {
   const toppings = item.toppings.length ? `, ${item.toppings.join(', ')}` : '';
-  const ice = item.icePercent == null ? '' : `, ${item.icePercent}% ice`;
-  return `${item.size}, ${item.sugarPercent}% sugar${ice}${toppings}`;
+  return `${item.size}, ${item.sugarPercent}% sugar, ${item.icePercent}% ice${toppings}`;
 }
 
 function getFirstAvailableProduct(products) {
@@ -506,17 +509,14 @@ async function refreshPreview() {
 }
 
 function toOrderPayload(line) {
-  const payload = {
+  return {
     productId: line.productId,
     quantity: line.quantity,
     size: line.size,
     sugarPercent: line.sugarPercent,
+    icePercent: line.icePercent,
     toppings: line.toppings,
   };
-  if (line.icePercent != null) {
-    payload.icePercent = line.icePercent;
-  }
-  return payload;
 }
 
 function buildPaymentPayload() {
@@ -693,9 +693,14 @@ async function bootStaff() {
     location.reload(); // Simplest way to reset everything
   };
 
-  // UI sugar level display
+  // UI sugar and ice level display
   document.getElementById('staff-sugar').oninput = (e) => {
     setText('staff-sugar-value', `${e.target.value}%`);
+  };
+  
+  // ADD THIS:
+  document.getElementById('staff-ice').oninput = (e) => {
+    setText('staff-ice-value', `${e.target.value}%`);
   };
 }
 
