@@ -1400,12 +1400,70 @@ body.high-contrast .chat-input {
   flex-shrink: 0;
 }
 
-/* Make the Product Grid tighter to fit more per row */
+/* --- High-Density Product Menu Fix --- */
 .product-grid-compact {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(95px, 1fr));
+  gap: 6px;
+  align-items: stretch;
+  align-content: start;
 }
+
+.product-grid-compact .product-card {
+  margin: 0 !important;
+  padding: 4px 6px !important; /* Extremely tight padding */
+  border-radius: 10px;
+  text-align: center;
+  height: 80px; /* Slightly shorter for better fit */
+  display: flex;
+  flex-direction: column;
+  justify-content: center; /* Centers text vertically */
+  align-items: center;
+  overflow: hidden;
+  background: var(--surface-strong);
+  border: 1px solid var(--line);
+  cursor: pointer;
+}
+
+/* Fix for the Product Name (h3) */
+.product-grid-compact .product-card h3 {
+  font-size: 0.72rem !important; /* Smaller, readable font */
+  font-weight: 600;
+  margin: 0 0 2px 0 !important;
+  line-height: 1.1;
+  width: 100%;
+  color: var(--ink);
+  
+  /* Multiline truncation: allows 3 lines then adds '...' */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word; /* Prevents long words from overflowing */
+}
+
+/* Fix for the Price */
+.product-grid-compact .product-card .price-line {
+  font-size: 0.7rem;
+  font-weight: 700;
+  margin: 0 !important;
+  color: var(--accent);
+  opacity: 0.9;
+}
+
+/* Hide extra info that cashiers don't need */
+.product-grid-compact .product-card .muted-line,
+.product-grid-compact .product-card .section-label,
+.product-grid-compact .product-card .out-of-stock-label {
+  display: none !important;
+}
+
+/* Visual cue for selected product */
+.product-grid-compact .product-card.selected {
+  border: 2px solid var(--accent);
+  background: var(--accent-soft);
+}
+
 /* Optimized Category Dropdown */
 #staff-category-filter {
   appearance: none; /* Removes default browser arrow */
