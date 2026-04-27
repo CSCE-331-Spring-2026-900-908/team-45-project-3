@@ -1,173 +1,148 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Staff Portal</title>
-    <link rel="stylesheet" href="/assets/styles.css" />
-  </head>
-  <body data-page="staff">
-    <div class="page-shell inner-page">
-      <header class="page-header">
-        <p class="eyebrow">Cashier Interface</p>
-      </header>
 
-      <main class="stack-layout">
-        <section id="staff-login-card" class="content-card auth-card">
-          <p class="section-label">Step 1</p>
-          <h2>Authenticate for cashier access</h2>
-          <form id="staff-login-form" class="auth-form">
-            <label>
-              <span>Username</span>
-              <input name="username" type="text" autocomplete="username" required />
-            </label>
-            <label>
-              <span>Password</span>
-              <input name="password" type="password" autocomplete="current-password" required />
-            </label>
-            <button class="action-button" type="submit">Sign In</button>
-          </form>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Staff Portal</title>
+  <link rel="stylesheet" href="/assets/styles.css" />
+</head>
+
+<body data-page="staff">
+  <div class="page-shell inner-page" style="padding-top: 10px; padding-bottom: 10px;">
+    <header class="page-header" style="padding: 12px; margin-bottom: 10px;">
+      <p class="eyebrow" style="margin: 0;">Cashier Interface</p>
+    </header>
+
+    <main class="stack-layout">
+      <section id="staff-login-card" class="content-card auth-card">
+        <p class="section-label">Step 1</p>
+        <h2>Authenticate for cashier access</h2>
+        <form id="staff-login-form" class="auth-form">
+          <label class="field-block">
+            <span>Employee PIN</span>
+            <input name="pin" type="password" placeholder="••••" maxlength="4"
+              style="text-align: center; font-size: 2rem; letter-spacing: 0.4em;" readonly required />
+          </label>
+
+          <div class="keypad-grid"
+            style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 20px 0;">
+            <button type="button" class="ghost-button keypad-btn" data-val="1">1</button>
+            <button type="button" class="ghost-button keypad-btn" data-val="2">2</button>
+            <button type="button" class="ghost-button keypad-btn" data-val="3">3</button>
+            <button type="button" class="ghost-button keypad-btn" data-val="4">4</button>
+            <button type="button" class="ghost-button keypad-btn" data-val="5">5</button>
+            <button type="button" class="ghost-button keypad-btn" data-val="6">6</button>
+            <button type="button" class="ghost-button keypad-btn" data-val="7">7</button>
+            <button type="button" class="ghost-button keypad-btn" data-val="8">8</button>
+            <button type="button" class="ghost-button keypad-btn" data-val="9">9</button>
+            <button type="button" class="ghost-button danger-button keypad-clear">Clear</button>
+            <button type="button" class="ghost-button keypad-btn" data-val="0">0</button>
+            <button type="submit" class="action-button">Go</button>
+          </div>
 
           <p id="staff-login-status" class="status-text" data-tone="neutral">
-            Use your employee credentials to access the cashier interface.
+            Enter your 4-digit PIN to unlock the interface.
           </p>
-        </section>
+        </form>
+      </section>
 
-        <section id="staff-workspace" class="stack-layout" hidden>
-          <section class="content-card">
-            <div class="section-heading">
-              <div>
-                <p class="section-label">Signed In</p>
-                <h2 id="staff-session-name">Staff User</h2>
-                <p class="muted-line">Role: <span id="staff-session-role">staff</span></p>
-              </div>
-              <button id="staff-sign-out" class="ghost-button" type="button">Sign Out</button>
+      <section id="staff-workspace" class="staff-dashboard-grid" hidden>
+
+        <section class="content-card dashboard-pane">
+          <div class="section-heading">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <p class="section-label" style="margin: 0;">Category:</p>
+              <select id="staff-category-filter">
+              </select>
             </div>
-            <ul id="staff-features" class="feature-list"></ul>
-          </section>
-
-          <section class="two-column">
-            <section class="content-card">
-              <div class="section-heading">
-                <div>
-                  <p class="section-label">Live Menu</p>
-                  <h2>Choose a product</h2>
-                </div>
-                <div class="toolbar">
-                  <select id="staff-category-filter"></select>
-                  <span id="staff-product-count" class="toolbar-note"></span>
-                </div>
-              </div>
-              <p id="staff-products-status" class="status-text" data-tone="neutral">Waiting for product data...</p>
-              <div id="staff-products" class="product-list"></div>
-            </section>
-
-            <section class="content-card">
-              <p class="section-label">Customization</p>
-              <h2 id="staff-selected-product">Select a product to customize</h2>
-              <p class="muted-line" id="staff-selected-price">Base price will appear here.</p>
-
-              <div class="stack-layout compact-gap">
-                <label class="field-block">
-                  <span>Quantity</span>
-                  <input id="staff-qty" class="numeric-input" type="number" min="1" value="1" />
-                </label>
-
-                <label class="field-block">
-                  <span>Size</span>
-                  <select id="staff-size">
-                    <option>Small</option>
-                    <option selected>Medium</option>
-                    <option>Large</option>
-                  </select>
-                </label>
-
-                <label class="field-block">
-                  <span>Sugar Level</span>
-                  <div class="range-line">
-                    <input id="staff-sugar" type="range" min="0" max="100" step="20" value="100" />
-                    <strong id="staff-sugar-value">100%</strong>
-                  </div>
-                </label>
-
-                <fieldset class="field-block check-fieldset">
-                  <legend>Toppings</legend>
-                  <div class="check-grid">
-                    <label><input type="checkbox" name="staff-topping" value="Boba" /> Boba</label>
-                    <label><input type="checkbox" name="staff-topping" value="Lychee Jelly" /> Lychee Jelly</label>
-                    <label><input type="checkbox" name="staff-topping" value="Pudding" /> Pudding</label>
-                    <label><input type="checkbox" name="staff-topping" value="Crystal Boba" /> Crystal Boba</label>
-                  </div>
-                </fieldset>
-
-                <button id="staff-add-to-cart" class="action-button" type="button">Add To Cart</button>
-                <p id="staff-cart-status" class="status-text" data-tone="neutral">
-                  Select a menu item, adjust the options, then add it to the cart.
-                </p>
-              </div>
-            </section>
-          </section>
-
-          <section class="two-column cart-layout">
-            <section class="content-card">
-              <p class="section-label">Cart</p>
-              <h2>Current order</h2>
-              <div id="staff-cart-lines" class="cart-list"></div>
-            </section>
-
-            <section class="content-card">
-              <p class="section-label">Order Preview</p>
-              <h2>Totals and payment</h2>
-              <div class="summary-grid">
-                <div><span>Subtotal</span><strong id="staff-subtotal">$0.00</strong></div>
-                <div><span>Tax</span><strong id="staff-tax">$0.00</strong></div>
-                <div><span>Total</span><strong id="staff-total">$0.00</strong></div>
-              </div>
-
-              <div class="checkout-grid">
-                <label class="field-block">
-                  <span>Primary Payment</span>
-                  <select id="staff-payment-primary">
-                    <option>Cash</option>
-                    <option>Credit Card</option>
-                    <option>Debit Card</option>
-                    <option>Gift Card</option>
-                  </select>
-                </label>
-                <label class="field-block">
-                  <span>Secondary Payment</span>
-                  <select id="staff-payment-secondary">
-                    <option value="">None</option>
-                    <option>Cash</option>
-                    <option>Credit Card</option>
-                    <option>Debit Card</option>
-                  </select>
-                </label>
-                <label class="field-block">
-                  <span>Gift Amount</span>
-                  <input id="staff-gift-amount" class="numeric-input" type="number" min="0" step="0.01" value="0" />
-                </label>
-                <label class="field-block">
-                  <span>Cash Received</span>
-                  <input id="staff-cash-received" class="numeric-input" type="number" min="0" step="0.01" value="0" />
-                </label>
-              </div>
-
-              <div class="button-row">
-                <button id="staff-preview-order" class="ghost-button" type="button">Refresh Preview</button>
-                <button id="staff-submit-order" class="action-button" type="button">Submit Order</button>
-              </div>
-
-              <p id="staff-preview-status" class="status-text" data-tone="neutral">
-                Cart totals and inventory warnings will appear here.
-              </p>
-              <ul id="staff-shortages" class="feature-list"></ul>
-            </section>
-          </section>
+            <button id="staff-sign-out" class="ghost-button mini-button">Sign Out</button>
+          </div>
+          <div id="staff-products" class="product-grid-compact pane-scroll">
+          </div>
         </section>
-      </main>
-    </div>
 
-    <script src="/assets/app.js"></script>
-  </body>
+        <section class="content-card dashboard-pane">
+          <p class="section-label">Customization</p>
+          <h3 id="staff-selected-product" class="compact-title">Select a drink</h3>
+
+          <div class="compact-stack pane-scroll">
+            <div class="checkout-grid">
+              <label class="field-block">
+                <span>Qty</span>
+                <input id="staff-qty" type="number" min="1" value="1" />
+              </label>
+              <label class="field-block">
+                <span>Size</span>
+                <select id="staff-size">
+                  <option>Small</option>
+                  <option selected>Medium</option>
+                  <option>Large</option>
+                </select>
+              </label>
+            </div>
+
+            <label class="field-block">
+              <span>Sugar: <strong id="staff-sugar-value">100%</strong></span>
+              <input id="staff-sugar" type="range" min="0" max="100" step="25" />
+            </label>
+
+            <fieldset class="check-fieldset-compact">
+              <legend>Toppings</legend>
+              <div class="check-grid-compact">
+                <label><input type="checkbox" name="staff-topping" value="Boba" /> Boba</label>
+                <label><input type="checkbox" name="staff-topping" value="Jelly" /> Jelly</label>
+                <label><input type="checkbox" name="staff-topping" value="Pudding" /> Pudding</label>
+                <label><input type="checkbox" name="staff-topping" value="Crystal" /> Crystal</label>
+              </div>
+            </fieldset>
+          </div>
+
+          <button id="staff-add-to-cart" class="action-button full-width">Add to Order</button>
+        </section>
+
+        <section class="content-card dashboard-pane">
+          <p class="section-label">Current Order</p>
+
+          <div id="staff-cart-lines" class="pane-scroll cart-list-compact">
+          </div>
+
+          <div class="totals-compact">
+            <div class="total-row"><span>Total </span><strong id="staff-total">$0.00</strong></div>
+
+            <div style="display:none;">
+              <input id="staff-gift-amount" type="number" value="0">
+              <input id="staff-subtotal" type="hidden" value="0">
+              <input id="staff-tax" type="hidden" value="0">
+              <select id="staff-payment-secondary">
+                <option value="">None</option>
+              </select>
+            </div>
+
+            <div class="checkout-grid" style="grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+              <label class="field-block">
+                <span style="font-size: 0.7rem;">Payment</span>
+                <select id="staff-payment-primary">
+                  <option>Cash</option>
+                  <option>Credit Card</option>
+                </select>
+              </label>
+              <label class="field-block">
+                <span style="font-size: 0.7rem;">Received</span>
+                <input id="staff-cash-received" type="number" step="0.01" value="0.00" style="padding: 4px;" />
+              </label>
+            </div>
+
+            <p id="staff-checkout-status" class="status-text" data-tone="neutral"></p>
+
+            <button id="staff-submit-order" class="action-button full-width">Submit Payment</button>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <script src="/assets/app.js"></script>
+</body>
+
 </html>

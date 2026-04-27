@@ -32,6 +32,27 @@ async function previewOrder(items) {
   return { lineItems, subtotal, tax, total, shortages, canSubmit: shortages.length === 0 && lineItems.length > 0 };
 }
 
+async function fetchProductAvailability() {
+  return withTransaction(async (client) => {
+    const products = await fetchProductsById(client);
+    const availability = new Map();
+
+    for (const product of products.values()) {
+      const requiredIngredients = await calculateRequiredIngredients(client, [{
+        productId: product.id,
+        quantity: 1,
+        size: 'Medium',
+        sugarPercent: 0,
+        toppings: [],
+      }]);
+      const shortages = await findIngredientShortages(client, requiredIngredients);
+      availability.set(product.id, shortages.length === 0);
+    }
+
+    return availability;
+  });
+}
+
 async function findInventoryShortages(items) {
   const orderLines = normalizeOrderLines(items);
   if (!orderLines.length) {
@@ -288,6 +309,7 @@ async function fetchIngredientNames(client) {
 }
 
 module.exports = {
+  fetchProductAvailability,
   findInventoryShortages,
   previewOrder,
   submitOrderWithPayment,

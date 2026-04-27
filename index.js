@@ -147,9 +147,21 @@ function createApp() {
 
   // --- Legacy / Standard Login API Route ---
   app.post('/api/auth/login', asyncHandler(async (req, res) => {
-    const { username, password, role } = req.body || {};
-    const result = await db.authenticateEmployee(username, password, role);
-    res.status(result.authenticated ? 200 : 401).json({ source: 'database', ...result });
+    const { username, password, pin, role } = req.body || {};
+    let result;
+
+    if (pin) {
+      result = await db.authenticateEmployeeByPin(pin);
+    } else {
+      result = await db.authenticateEmployee(username, password, role);
+    }
+
+    // Double check this line:
+    if (result && result.authenticated === true) { 
+      res.status(200).json(result);
+    } else {
+      res.status(401).json({ authenticated: false, message: "Login failed" });
+    }
   }));
 
   app.get('/api/auth/status', (req, res) => {
@@ -161,15 +173,15 @@ function createApp() {
   });
 
   app.get('/api/customer/rewards/session', asyncHandler(async (req, res) => {
-    const rewardsEmail = req.session.customerRewardsEmail;
-    if (!rewardsEmail) {
+    const rewardsPhoneNumber = req.session.customerRewardsPhoneNumber;
+    if (!rewardsPhoneNumber) {
       res.json({ authenticated: false });
       return;
     }
 
-    const profile = await db.fetchRewardsAccountByEmail(rewardsEmail);
+    const profile = await db.fetchRewardsAccountByPhone(rewardsPhoneNumber);
     if (!profile) {
-      delete req.session.customerRewardsEmail;
+      delete req.session.customerRewardsPhoneNumber;
       res.json({ authenticated: false });
       return;
     }
@@ -180,19 +192,19 @@ function createApp() {
   app.post('/api/customer/rewards/register', asyncHandler(async (req, res) => {
     ensureWritesEnabled();
     const profile = await db.registerRewardsAccount(req.body || {});
-    req.session.customerRewardsEmail = profile.email;
+    req.session.customerRewardsPhoneNumber = profile.phoneNumber;
     res.status(201).json({ authenticated: true, profile });
   }));
 
   app.post('/api/customer/rewards/login', asyncHandler(async (req, res) => {
-    const { email, password } = req.body || {};
-    const profile = await db.authenticateRewardsAccount(email, password);
-    req.session.customerRewardsEmail = profile.email;
+    const { phoneNumber } = req.body || {};
+    const profile = await db.authenticateRewardsAccount(phoneNumber);
+    req.session.customerRewardsPhoneNumber = profile.phoneNumber;
     res.json({ authenticated: true, profile });
   }));
 
   app.post('/api/customer/rewards/logout', (req, res) => {
-    delete req.session.customerRewardsEmail;
+    delete req.session.customerRewardsPhoneNumber;
     res.json({ ok: true });
   });
 
@@ -207,7 +219,17 @@ function createApp() {
 
   // --- Read-only API routes ---
   app.get('/api/products', asyncHandler(async (_, res) => {
-    res.json({ source: 'database', items: await db.fetchProducts() });
+    const [items, availability] = await Promise.all([
+      db.fetchProducts(),
+      db.fetchProductAvailability(),
+    ]);
+    res.json({
+      source: 'database',
+      items: items.map((item) => ({
+        ...item,
+        outOfStock: availability.get(item.id) === false,
+      })),
+    });
   }));
 
   app.get('/api/categories', asyncHandler(async (_, res) => {
@@ -281,8 +303,8 @@ function createApp() {
 
   app.post('/api/customer/rewards/increment', asyncHandler(async (req, res) => {
     ensureWritesEnabled();
-    const rewardsEmail = req.session.customerRewardsEmail;
-    if (!rewardsEmail) {
+    const rewardsPhoneNumber = req.session.customerRewardsPhoneNumber;
+    if (!rewardsPhoneNumber) {
       const error = new Error('Sign in to a rewards account before updating rewards.');
       error.statusCode = 401;
       throw error;
@@ -290,14 +312,14 @@ function createApp() {
 
     res.json({
       ok: true,
-      profile: await db.incrementRewardsCounter(rewardsEmail),
+      profile: await db.incrementRewardsCounter(rewardsPhoneNumber),
     });
   }));
 
   app.post('/api/customer/rewards/redeem', asyncHandler(async (req, res) => {
     ensureWritesEnabled();
-    const rewardsEmail = req.session.customerRewardsEmail;
-    if (!rewardsEmail) {
+    const rewardsPhoneNumber = req.session.customerRewardsPhoneNumber;
+    if (!rewardsPhoneNumber) {
       const error = new Error('Sign in to a rewards account before redeeming a free drink.');
       error.statusCode = 401;
       throw error;
@@ -305,7 +327,7 @@ function createApp() {
 
     res.json({
       ok: true,
-      profile: await db.redeemFreeDrinkCredit(rewardsEmail),
+      profile: await db.redeemFreeDrinkCredit(rewardsPhoneNumber),
     });
   }));
 
@@ -400,31 +422,48 @@ function createApp() {
     res.json({ source: 'database', rows: await db.deleteEmployee(employeeId) });
   }));
 
-  // --- Machine Translation route ---
-  app.post('/api/translate', asyncHandler(async (req, res) => {
-    const { text, targetLang } = req.body || {};
+  // Google uses zh-CN for Simplified Chinese; all other codes match directly
+  const GOOGLE_LANG_MAP = { zh: 'zh-CN' };
 
-    if (!text || !targetLang) {
-      res.status(400).json({ error: 'text and targetLang are required.' });
+  // --- Machine Translation route (Google Cloud Translation API) ---
+  app.post('/api/translate', asyncHandler(async (req, res) => {
+    const { texts, targetLang } = req.body || {};
+
+    if (!targetLang || !Array.isArray(texts) || texts.length === 0) {
+      res.status(400).json({ error: 'texts (array) and targetLang are required.' });
       return;
     }
 
     if (targetLang === 'en') {
-      res.json({ translatedText: text });
+      res.json({ translations: Object.fromEntries(texts.map((s) => [s, s])) });
       return;
     }
 
-    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(String(text).slice(0, 500))}&langpair=en|${encodeURIComponent(targetLang)}`;
-    const response = await fetch(url);
+    const apiKey = process.env.GOOGLE_TRANSLATE_API_KEY;
+    if (!apiKey) {
+      res.status(503).json({ error: 'Translation service not configured. Set GOOGLE_TRANSLATE_API_KEY in the environment.' });
+      return;
+    }
+
+    const googleLang = GOOGLE_LANG_MAP[targetLang] || targetLang;
+    const url = `https://translation.googleapis.com/language/translate/v2?key=${apiKey}`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ q: texts, target: googleLang, source: 'en', format: 'text' }),
+    });
 
     if (!response.ok) {
-      res.status(502).json({ error: 'Translation service unavailable.' });
+      const err = await response.json().catch(() => ({}));
+      res.status(502).json({ error: err?.error?.message || 'Google Translate request failed.' });
       return;
     }
 
     const data = await response.json();
-    const translatedText = data?.responseData?.translatedText || text;
-    res.json({ translatedText });
+    const translated = data?.data?.translations?.map((t) => t.translatedText) ?? texts;
+
+    res.json({ translations: Object.fromEntries(texts.map((s, i) => [s, translated[i] ?? s])) });
   }));
 
   // --- AI Chatbot route ---
@@ -448,7 +487,8 @@ function createApp() {
 
     const systemPrompt =
       'You are a friendly and helpful assistant for 12th Man Tea, a boba tea shop. ' +
-      'Your job is to help customers with menu information, drink recommendations, and ordering guidance.\n\n' +
+      'Your job is to help customers with menu information, drink recommendations, and ordering guidance. ' +
+      'Always respond in the same language the customer is writing in.\n\n' +
       `Current menu:\n${menuText}\n\n` +
       'Drink customization options:\n' +
       '  • Size: Small, Medium, or Large\n' +

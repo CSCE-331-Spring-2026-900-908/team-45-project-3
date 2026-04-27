@@ -14,7 +14,7 @@
       <header class="page-header customer-hero">
         <div class="customer-hero-copy">
           <p class="eyebrow" data-i18n="Customer Interface">Customer Interface</p>
-          <h1 data-i18n="Build your drink and keep the cart in view.">Build your drink and keep the cart in view.</h1>
+          <h1 data-i18n="Order Page">Order Page</h1>
           <p data-i18n="Pick a category, customize your drink, and track rewards on every order.">
             Pick a category, customize your drink, and
             track rewards on every order.
@@ -26,6 +26,23 @@
           <button id="customer-contrast-toggle" class="ghost-button customer-contrast-toggle" type="button" aria-pressed="false" data-i18n="Enable High Contrast">
             Enable High Contrast
           </button>
+          <label class="customer-lang-label">
+            <span data-i18n="Text Size">Text Size</span>
+            <select id="customer-text-size" class="customer-lang-select" aria-label="Select text size">
+              <option value="1">Default</option>
+              <option value="1.1">Large</option>
+              <option value="1.2">Extra Large</option>
+              <option value="1.35">Maximum</option>
+            </select>
+          </label>
+          <div class="customer-zoom-controls" aria-label="Magnification controls">
+            <span class="customer-lang-label" data-i18n="Magnification">Magnification</span>
+            <div class="button-row customer-zoom-actions">
+              <button id="customer-zoom-decrease" class="ghost-button mini-button" type="button" aria-label="Decrease magnification">-</button>
+              <span id="customer-zoom-readout" class="customer-zoom-readout">100%</span>
+              <button id="customer-zoom-increase" class="ghost-button mini-button" type="button" aria-label="Increase magnification">+</button>
+            </div>
+          </div>
           <label class="customer-lang-label">
             <span data-i18n="Language">Language</span>
             <select id="customer-lang-select" class="customer-lang-select" aria-label="Select display language">
@@ -47,44 +64,66 @@
               <div>
                 <p class="section-label" data-i18n="Rewards Login">Rewards Login</p>
                 <h2 id="customer-menu-heading" data-i18n="Welcome to the menu">Welcome to the menu</h2>
-                <p class="muted-line" data-i18n="Sign in with your name and email to track the free-drink reward on every 5th order.">
-                  Sign in with your name and email to track the free-drink reward on every 5th order.
+                <p class="muted-line" data-i18n="Sign in with your phone number to track the free-drink reward on every 5th order.">
+                  Sign in with your phone number to track the free-drink reward on every 5th order.
                 </p>
               </div>
             </div>
 
             <div class="customer-account-grid">
-              <form id="customer-login-form" class="auth-form compact-auth-form" autocomplete="on">
-                <label>
-                  <span data-i18n="Name for rewards account">Name for rewards account</span>
-                  <input id="customer-name" name="name" type="text" autocomplete="name" />
-                </label>
-                <label>
-                  <span data-i18n="Email">Email</span>
-                  <input id="customer-email" name="email" type="email" autocomplete="email" required />
-                </label>
-                <label>
-                  <span data-i18n="Password">Password</span>
-                  <input id="customer-password" name="password" type="password" autocomplete="current-password" minlength="8" required />
-                </label>
-                <div class="button-row customer-login-actions">
+              <div class="customer-numpad-panel">
+                <p class="customer-numpad-label" data-i18n="Rewards phone number">Rewards phone number</p>
+                <div class="customer-phone-display-wrap">
+                  <input
+                    id="customer-phone"
+                    name="phoneNumber"
+                    form="customer-login-form"
+                    type="tel"
+                    inputmode="none"
+                    autocomplete="tel"
+                    maxlength="14"
+                    placeholder="(555) 123-4567"
+                    required
+                    readonly
+                    class="customer-phone-display"
+                  />
+                </div>
+                <div class="customer-numpad" aria-label="Phone number keypad">
+                  <button type="button" class="customer-numpad-key" data-digit="1">1</button>
+                  <button type="button" class="customer-numpad-key" data-digit="2">2</button>
+                  <button type="button" class="customer-numpad-key" data-digit="3">3</button>
+                  <button type="button" class="customer-numpad-key" data-digit="4">4</button>
+                  <button type="button" class="customer-numpad-key" data-digit="5">5</button>
+                  <button type="button" class="customer-numpad-key" data-digit="6">6</button>
+                  <button type="button" class="customer-numpad-key" data-digit="7">7</button>
+                  <button type="button" class="customer-numpad-key" data-digit="8">8</button>
+                  <button type="button" class="customer-numpad-key" data-digit="9">9</button>
+                  <button type="button" class="customer-numpad-key customer-numpad-clear" data-digit="clear" data-i18n="Clear">Clear</button>
+                  <button type="button" class="customer-numpad-key" data-digit="0">0</button>
+                  <button type="button" class="customer-numpad-key customer-numpad-back" data-digit="back" aria-label="Backspace">⌫</button>
+                </div>
+                <form id="customer-login-form" class="customer-numpad-actions" autocomplete="on">
                   <button id="customer-login" class="action-button" type="submit" data-i18n="Sign In">Sign In</button>
                   <button id="customer-register" class="ghost-button" type="button" data-i18n="Create Account">Create Account</button>
                   <button id="customer-logout" class="ghost-button" type="button" data-i18n="Sign Out">Sign Out</button>
-                </div>
-              </form>
+                </form>
+              </div>
 
               <section class="customer-rewards-card" aria-labelledby="customer-rewards-heading">
-                <p class="section-label" data-i18n="Rewards Status">Rewards Status</p>
+                <div class="customer-rewards-card-top">
+                  <p class="customer-rewards-card-label" data-i18n="Rewards">Rewards</p>
+                  <span class="customer-rewards-badge" aria-hidden="true">🧋</span>
+                </div>
                 <h3 id="customer-rewards-heading">No rewards profile yet</h3>
-                <p id="customer-rewards-id" class="muted-line" style="font-size:0.8em;opacity:0.7;"></p>
-                <p id="customer-rewards-copy" class="muted-line">
+                <p id="customer-rewards-id" class="customer-rewards-id-line"></p>
+                <p id="customer-rewards-copy" class="customer-rewards-copy">
                   Sign in or create an account to count orders toward a free drink.
                 </p>
+                <div id="customer-rewards-stamps" class="customer-rewards-stamps" aria-hidden="true"></div>
                 <div class="customer-rewards-progress" aria-hidden="true">
                   <div id="customer-rewards-bar" class="customer-rewards-progress-bar"></div>
                 </div>
-                <p id="customer-rewards-meta" class="muted-line">0 of 5 orders completed toward next reward</p>
+                <p id="customer-rewards-meta" class="customer-rewards-meta">0 of 5 orders completed</p>
               </section>
             </div>
           </section>
@@ -137,7 +176,7 @@
             <button id="customer-checkout" class="action-button" type="button" data-i18n="Place Order">Place Order</button>
           </div>
 
-          <p id="customer-cart-status" class="status-text" data-tone="neutral">
+          <p id="customer-cart-status" class="status-text" data-tone="neutral" data-i18n="Choose an item to start building your order.">
             Choose an item to start building your order.
           </p>
         </aside>
@@ -230,8 +269,8 @@
       <div class="chat-panel" id="chat-panel" role="log" aria-live="polite" aria-label="Chat messages">
         <div class="chat-panel-header">
           <div>
-            <p class="section-label" style="margin:0">AI Assistant</p>
-            <p class="chat-panel-subtitle">Menu help &amp; drink recommendations</p>
+            <p class="section-label" style="margin:0" data-i18n="AI Assistant">AI Assistant</p>
+            <p class="chat-panel-subtitle" data-i18n="Menu help &amp; drink recommendations">Menu help &amp; drink recommendations</p>
           </div>
           <button id="chat-close" class="ghost-button mini-button" type="button" aria-label="Close chat">✕</button>
         </div>
@@ -246,12 +285,23 @@
             maxlength="500"
             required
           />
-          <button id="chat-send" class="action-button chat-send-button" type="submit">Send</button>
+          <button id="chat-send" class="action-button chat-send-button" type="submit" data-i18n="Send">Send</button>
         </form>
       </div>
     </div>
     <button id="chat-toggle" class="chat-toggle-button" type="button" aria-label="Open chat assistant" aria-expanded="false">
       💬
+    </button>
+
+    <button
+      id="customer-accessibility-toggle"
+      class="customer-accessibility-fab"
+      type="button"
+      aria-label="Open accessibility options"
+      aria-controls="customer-accessibility-panel"
+      aria-expanded="false"
+    >
+      <span class="customer-accessibility-fab-icon" aria-hidden="true">♿</span>
     </button>
 
     <script src="/assets/app.js"></script>
