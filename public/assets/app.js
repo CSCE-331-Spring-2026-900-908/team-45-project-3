@@ -219,7 +219,7 @@ function getRoleSession() {
 }
 
 function requirePortalAccess(page) {
-  if (page === 'portal') {
+  if (page === 'portal' || page === 'customer') {
     return true;
   }
   const allowedRole = sessionStorage.getItem(ACCESS_KEY);
