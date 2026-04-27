@@ -956,6 +956,7 @@ body.high-contrast {
   --accent-dark: #ffe775;
   --accent-soft: #1e1e1e;
   --shadow: 0 0 0 rgba(0, 0, 0, 0);
+  font-size: calc(100% + 2px); /* Increased base text size by 2px */
 }
 body.high-contrast {
   background: #090909;
