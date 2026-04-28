@@ -62,15 +62,27 @@
           </div>
         </section>
 
-        <section class="content-card dashboard-pane">
+        <section id="staff-customization-panel" class="content-card dashboard-pane" hidden>
           <p class="section-label">Customization</p>
           <h3 id="staff-selected-product" class="compact-title">Select a drink</h3>
+          <p id="staff-selected-price" class="muted-line">Select a product to customize.</p>
 
           <div class="compact-stack pane-scroll">
-            <div class="checkout-grid">
+            <div class="checkout-grid staff-customization-grid">
               <label class="field-block">
                 <span>Qty</span>
-                <input id="staff-qty" type="number" min="1" value="1" />
+                <div class="quantity-stepper">
+                  <button id="staff-qty-decrement" class="ghost-button mini-button quantity-stepper-button"
+                    type="button" aria-label="Decrease quantity">
+                    -
+                  </button>
+                  <input id="staff-qty" class="numeric-input" type="number" min="1" value="1" readonly
+                    inputmode="none" aria-live="polite" />
+                  <button id="staff-qty-increment" class="ghost-button mini-button quantity-stepper-button"
+                    type="button" aria-label="Increase quantity">
+                    +
+                  </button>
+                </div>
               </label>
               <label class="field-block">
                 <span>Size</span>
@@ -87,10 +99,17 @@
               <input id="staff-sugar" type="range" min="0" max="200" step="25" value="100" />
             </label>
 
-            <label class="field-block">
-              <span>Ice: <strong id="staff-ice-value">100%</strong></span>
-              <input id="staff-ice" type="range" min="0" max="100" step="25" value="100" />
-            </label>
+            <fieldset class="field-block">
+              <legend>Ice Level</legend>
+              <div class="customer-choice-grid staff-ice-grid">
+                <label><input type="radio" name="staff-ice" value="0" /> 0%</label>
+                <label><input type="radio" name="staff-ice" value="25" /> 25%</label>
+                <label><input type="radio" name="staff-ice" value="50" /> 50%</label>
+                <label><input type="radio" name="staff-ice" value="75" /> 75%</label>
+                <label><input type="radio" name="staff-ice" value="100" checked /> 100%</label>
+                <label><input type="radio" name="staff-ice" value="200" /> Hot</label>
+              </div>
+            </fieldset>
 
             <fieldset class="check-fieldset-compact">
               <legend>Toppings</legend>

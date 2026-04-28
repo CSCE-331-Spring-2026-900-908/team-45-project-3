@@ -7,6 +7,7 @@ const staffState = {
   cart: [],
   selectedProductId: null,
   preview: { ...EMPTY_PREVIEW },
+  lastCustomizationTrigger: null,
   isSubmittingOrder: false,
 };
 const managerState = {
@@ -52,6 +53,8 @@ const customerState = {
   zoomScale: 1,
   lastDialogTrigger: null,
   lastRewardsTrigger: null,
+  lastCategoryTrigger: null,
+  suppressCategoryFocusRestore: false,
   isSubmittingOrder: false,
 };
 // ── Translation ───────────────────────────────────────────────────────────────
@@ -88,8 +91,21 @@ const JS_STATIC_STRINGS = [
   'You have 1 free drink credit ready to use on your next order!',
   'You have',
   'free drink credits ready to use!',
+  'Close',
+  'Hot',
+  'Small',
+  'Medium',
+  'Large',
+  'item',
+  'items',
   'item available',
   'items available',
+  'Out of Stock',
+  'Out of stock.',
+  'Open customization options.',
+  'Base price',
+  'Adjust size, sweetness, ice, and toppings.',
+  'All options are keyboard accessible and remain readable for translation tools.',
   'No products are available in this category right now.',
   'Your cart is empty. Pick a drink to customize and add it here.',
 ];
@@ -261,6 +277,7 @@ function setStatus(id, message, tone = 'neutral') {
   }
   element.textContent = message;
   element.dataset.tone = tone;
+  element.classList.toggle('is-loading', tone === 'loading');
 }
 
 function renderList(elementId, items, mapper = (item) => escapeHtml(item)) {
@@ -334,16 +351,30 @@ function defaultCustomization() {
   return { quantity: 1, size: 'Medium', sugarPercent: 100, icePercent: 100, toppings: [] };
 }
 
+function readPercentInput(id, fallback) {
+  const value = Number(document.getElementById(id)?.value);
+  return Number.isFinite(value) ? value : fallback;
+}
+
 function getSelectedProduct() {
   return staffState.products.find((item) => item.id === staffState.selectedProductId) || null;
+}
+
+function formatIceLevel(value) {
+  return Number(value) === 200 ? 'Hot' : `${Number(value || 0)}% ice`;
+}
+
+function readStaffIcePercent() {
+  const iceField = document.querySelector('input[name="staff-ice"]:checked');
+  return iceField ? Number(iceField.value) : 100;
 }
 
 function readCustomizationForm() {
   return {
     quantity: Math.max(1, Number(document.getElementById('staff-qty').value) || 1),
     size: document.getElementById('staff-size').value,
-    sugarPercent: Number(document.getElementById('staff-sugar').value) || 100,
-    icePercent: Number(document.getElementById('staff-ice').value) || 100,
+    sugarPercent: readPercentInput('staff-sugar', 100),
+    icePercent: readStaffIcePercent(),
     toppings: Array.from(document.querySelectorAll('input[name="staff-topping"]:checked')).map((element) => element.value),
   };
 }
@@ -356,12 +387,123 @@ function resetCustomizationForm() {
   document.getElementById('staff-sugar').value = defaults.sugarPercent;
   setText('staff-sugar-value', `${defaults.sugarPercent}%`);
   
-  document.getElementById('staff-ice').value = defaults.icePercent;
-  setText('staff-ice-value', `${defaults.icePercent}%`);
+  const defaultIceField = document.querySelector(`input[name="staff-ice"][value="${defaults.icePercent}"]`);
+  if (defaultIceField) {
+    defaultIceField.checked = true;
+  }
   
   document.querySelectorAll('input[name="staff-topping"]').forEach((element) => {
     element.checked = false;
   });
+}
+
+function setStaffQuantity(nextValue) {
+  const quantityInput = document.getElementById('staff-qty');
+  if (!quantityInput) {
+    return;
+  }
+
+  quantityInput.value = String(Math.max(1, Number(nextValue) || 1));
+}
+
+function adjustStaffQuantity(delta) {
+  const quantityInput = document.getElementById('staff-qty');
+  if (!quantityInput) {
+    return;
+  }
+
+  setStaffQuantity((Number(quantityInput.value) || 1) + delta);
+}
+
+function setupStaffCustomizationDialog() {
+  const panel = document.getElementById('staff-customization-panel');
+  if (!panel || document.getElementById('staff-customization-dialog')) {
+    return;
+  }
+
+  const dialog = document.createElement('dialog');
+  dialog.id = 'staff-customization-dialog';
+  dialog.className = 'customer-dialog staff-customization-dialog';
+  dialog.setAttribute('aria-labelledby', 'staff-selected-product');
+  dialog.setAttribute('aria-describedby', 'staff-selected-price');
+  dialog.setAttribute('aria-modal', 'true');
+
+  panel.hidden = false;
+  panel.classList.remove('content-card', 'dashboard-pane');
+  panel.classList.add('customer-dialog-form', 'staff-customization-panel');
+
+  const closeButton = document.createElement('button');
+  closeButton.id = 'staff-close-customization-dialog';
+  closeButton.className = 'ghost-button mini-button staff-customization-close';
+  closeButton.type = 'button';
+  closeButton.setAttribute('aria-label', 'Close customization dialog');
+  closeButton.textContent = 'Close';
+  panel.insertBefore(closeButton, panel.firstChild);
+
+  dialog.appendChild(panel);
+  document.body.insertBefore(dialog, document.querySelector('script[src="/assets/app.js"]'));
+}
+
+function getStaffCustomizationDialogFocusableElements() {
+  const dialog = document.getElementById('staff-customization-dialog');
+  if (!dialog) {
+    return [];
+  }
+
+  return Array.from(dialog.querySelectorAll(
+    'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+  )).filter((element) => !element.hasAttribute('hidden'));
+}
+
+function openStaffCustomizationDialog(trigger = null) {
+  staffState.lastCustomizationTrigger = trigger || (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+  const dialog = document.getElementById('staff-customization-dialog');
+  if (!dialog) {
+    return;
+  }
+
+  resetCustomizationForm();
+
+  if (typeof dialog.showModal === 'function') {
+    dialog.showModal();
+  } else {
+    dialog.setAttribute('open', 'true');
+  }
+
+  document.getElementById('staff-qty-increment')?.focus();
+}
+
+function restoreStaffCustomizationDialogFocus() {
+  const lastTrigger = staffState.lastCustomizationTrigger;
+  staffState.lastCustomizationTrigger = null;
+  if (lastTrigger && document.contains(lastTrigger)) {
+    lastTrigger.focus();
+    return;
+  }
+
+  document.querySelector('.product-card.selected')?.focus();
+}
+
+function closeStaffCustomizationDialog() {
+  const dialog = document.getElementById('staff-customization-dialog');
+  if (typeof dialog?.close === 'function') {
+    dialog.close();
+  } else {
+    dialog?.removeAttribute('open');
+    restoreStaffCustomizationDialogFocus();
+  }
+}
+
+function refreshCustomerProductsInBackground() {
+  fetchJson('/api/products')
+    .then((productsData) => {
+      customerState.products = productsData.items || customerState.products;
+      renderCustomerCategoryButtons();
+      renderCustomerProducts();
+    })
+    .catch((error) => {
+      console.warn('Unable to refresh customer products after checkout:', error);
+    });
 }
 
 function customizationMatches(a, b) {
@@ -373,7 +515,25 @@ function customizationMatches(a, b) {
 
 function customizationSummary(item) {
   const toppings = item.toppings.length ? `, ${item.toppings.join(', ')}` : '';
-  return `${item.size}, ${item.sugarPercent}% sugar, ${item.icePercent}% ice${toppings}`;
+  return `${item.size}, ${item.sugarPercent}% sugar, ${formatIceLevel(item.icePercent)}${toppings}`;
+}
+
+function mergePreviewLineItems(cart, previewLineItems) {
+  if (!Array.isArray(previewLineItems) || previewLineItems.length !== cart.length) {
+    return cart;
+  }
+
+  return previewLineItems.map((previewLine, index) => {
+    const cartLine = cart[index];
+    return {
+      ...cartLine,
+      ...previewLine,
+      size: cartLine.size,
+      sugarPercent: cartLine.sugarPercent,
+      icePercent: cartLine.icePercent,
+      toppings: cartLine.toppings,
+    };
+  });
 }
 
 function getFirstAvailableProduct(products) {
@@ -421,6 +581,7 @@ function renderStaffProducts() {
       setText('staff-selected-product', item.name);
       setText('staff-selected-price', `Base price ${formatCurrency(item.price)} before size adjustment.`);
       renderStaffProducts();
+      openStaffCustomizationDialog(document.querySelector('.product-card.selected') || card);
       setStatus('staff-cart-status', `Selected ${item.name}. Adjust the options and add it to the cart.`, 'neutral');
     };
 
@@ -501,9 +662,7 @@ async function refreshPreview() {
   });
   staffState.preview = preview;
 
-  if (Array.isArray(preview.lineItems) && preview.lineItems.length === staffState.cart.length) {
-    staffState.cart = preview.lineItems.map((line) => ({ ...line }));
-  }
+  staffState.cart = mergePreviewLineItems(staffState.cart, preview.lineItems);
 
   renderCart();
   renderPreview();
@@ -572,6 +731,8 @@ async function bootStaff() {
     showStaffWorkspace(session);
     await loadStaffProducts();
   }
+
+  setupStaffCustomizationDialog();
 
   // 2. PIN Keypad Logic
   const loginForm = document.getElementById('staff-login-form');
@@ -648,7 +809,50 @@ async function bootStaff() {
 
     // Optional: reset form to defaults after adding
     resetCustomizationForm();
+    closeStaffCustomizationDialog();
   };
+
+  document.getElementById('staff-qty-decrement')?.addEventListener('click', () => {
+    adjustStaffQuantity(-1);
+  });
+  document.getElementById('staff-qty-increment')?.addEventListener('click', () => {
+    adjustStaffQuantity(1);
+  });
+  document.getElementById('staff-close-customization-dialog')?.addEventListener('click', closeStaffCustomizationDialog);
+  document.getElementById('staff-customization-dialog')?.addEventListener('close', restoreStaffCustomizationDialogFocus);
+  document.getElementById('staff-customization-dialog')?.addEventListener('keydown', (event) => {
+    const dialog = event.currentTarget;
+    if (!dialog.hasAttribute('open')) {
+      return;
+    }
+
+    if (event.key === 'Escape' && typeof dialog.showModal !== 'function') {
+      event.preventDefault();
+      closeStaffCustomizationDialog();
+      return;
+    }
+
+    if (event.key !== 'Tab') {
+      return;
+    }
+
+    const focusableElements = getStaffCustomizationDialogFocusableElements();
+    if (!focusableElements.length) {
+      return;
+    }
+
+    const first = focusableElements[0];
+    const last = focusableElements[focusableElements.length - 1];
+    const activeElement = document.activeElement;
+
+    if (event.shiftKey && activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  });
 
   document.getElementById('staff-submit-order').onclick = async () => {
     if (!staffState.cart.length) {
@@ -699,10 +903,6 @@ async function bootStaff() {
     setText('staff-sugar-value', `${e.target.value}%`);
   };
   
-  // ADD THIS:
-  document.getElementById('staff-ice').oninput = (e) => {
-    setText('staff-ice-value', `${e.target.value}%`);
-  };
 }
 
 function showStaffWorkspace(session) {
@@ -1725,7 +1925,7 @@ function loadCustomerTextScalePreference() {
 
 function loadCustomerZoomPreference() {
   const value = Number(localStorage.getItem(CUSTOMER_ZOOM_KEY) || 1);
-  return Math.min(1.4, Math.max(0.9, Number.isFinite(value) ? value : 1));
+  return Math.min(1.4, Math.max(0.5, Number.isFinite(value) ? value : 1));
 }
 
 function setCustomerContrastPreference(enabled) {
@@ -1749,7 +1949,7 @@ function setCustomerTextScale(scale) {
 }
 
 function setCustomerZoomScale(scale) {
-  const normalized = Math.min(1.4, Math.max(0.9, Number(scale) || 1));
+  const normalized = Math.min(1.4, Math.max(0.5, Number(scale) || 1));
   customerState.zoomScale = normalized;
   document.documentElement.style.setProperty('--customer-zoom-scale', String(normalized));
   localStorage.setItem(CUSTOMER_ZOOM_KEY, String(normalized));
@@ -1816,14 +2016,13 @@ function getCustomerRewardDiscount() {
 
 function readCustomerCustomizationForm() {
   const sizeField = document.querySelector('input[name="customer-size"]:checked');
-  const sugarField = document.querySelector('input[name="customer-sugar"]:checked');
   // Add the ice field reader
   const iceField = document.querySelector('input[name="customer-ice"]:checked'); 
 
   return {
     quantity: Math.max(1, Number(document.getElementById('customer-qty').value) || 1),
     size: sizeField ? sizeField.value : 'Medium',
-    sugarPercent: sugarField ? Number(sugarField.value) : 50,
+    sugarPercent: readPercentInput('customer-sugar', 50),
     // Safely read the ice value, default to 50
     icePercent: iceField ? Number(iceField.value) : 50, 
     toppings: Array.from(document.querySelectorAll('input[name="customer-topping"]:checked')).map((element) => element.value),
@@ -1833,7 +2032,8 @@ function readCustomerCustomizationForm() {
 function resetCustomerCustomizationForm() {
   document.getElementById('customer-qty').value = '1';
   document.querySelector('input[name="customer-size"][value="Medium"]').checked = true;
-  document.querySelector('input[name="customer-sugar"][value="50"]').checked = true;
+  document.getElementById('customer-sugar').value = '50';
+  setText('customer-sugar-value', '50%');
   
   // Add this line to reset the ice back to 50% when the dialog closes
   document.querySelector('input[name="customer-ice"][value="50"]').checked = true; 
@@ -1973,6 +2173,107 @@ function closeCustomerRewardsDialog() {
   }
 }
 
+function setupCustomerCategoryDialog() {
+  const panel = document.getElementById('customer-category-products-panel');
+  if (!panel || document.getElementById('customer-category-dialog')) {
+    return;
+  }
+
+  const dialog = document.createElement('dialog');
+  dialog.id = 'customer-category-dialog';
+  dialog.className = 'customer-dialog customer-category-dialog';
+  dialog.setAttribute('aria-labelledby', 'customer-active-category');
+  dialog.setAttribute('aria-describedby', 'customer-category-description');
+  dialog.setAttribute('aria-modal', 'true');
+  dialog.setAttribute('translate', 'yes');
+
+  panel.hidden = false;
+  panel.classList.remove('content-card');
+  panel.classList.add('customer-dialog-form');
+
+  const heading = panel.querySelector('.section-heading');
+  const closeButton = document.createElement('button');
+  closeButton.id = 'customer-close-category-dialog';
+  closeButton.className = 'ghost-button mini-button';
+  closeButton.type = 'button';
+  closeButton.setAttribute('aria-label', 'Close category menu dialog');
+  closeButton.dataset.i18n = 'Close';
+  closeButton.textContent = t('Close');
+  heading?.appendChild(closeButton);
+
+  dialog.appendChild(panel);
+  document.body.insertBefore(dialog, document.getElementById('customer-customize-dialog'));
+}
+
+function getCustomerCategoryDialogFocusableElements() {
+  const dialog = document.getElementById('customer-category-dialog');
+  if (!dialog) {
+    return [];
+  }
+
+  return Array.from(dialog.querySelectorAll(
+    'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+  )).filter((element) => !element.hasAttribute('hidden'));
+}
+
+function openCustomerCategoryDialog(trigger = null) {
+  customerState.lastCategoryTrigger = trigger || (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+  const dialog = document.getElementById('customer-category-dialog');
+  if (!dialog) {
+    return;
+  }
+
+  if (typeof dialog.showModal === 'function') {
+    dialog.showModal();
+  } else {
+    dialog.setAttribute('open', 'true');
+  }
+
+  const firstProductTile = document.querySelector('#customer-product-grid .customer-product-tile:not([disabled])');
+  if (firstProductTile) {
+    firstProductTile.focus();
+  } else {
+    document.getElementById('customer-close-category-dialog')?.focus();
+  }
+}
+
+function restoreCustomerCategoryDialogFocus() {
+  if (customerState.suppressCategoryFocusRestore) {
+    customerState.suppressCategoryFocusRestore = false;
+    customerState.lastCategoryTrigger = null;
+    return;
+  }
+
+  const lastTrigger = customerState.lastCategoryTrigger;
+  customerState.lastCategoryTrigger = null;
+  if (lastTrigger && document.contains(lastTrigger)) {
+    lastTrigger.focus();
+    return;
+  }
+
+  document.querySelector('.customer-category-button.active')?.focus();
+}
+
+function closeCustomerCategoryDialog(restoreFocus = true) {
+  const dialog = document.getElementById('customer-category-dialog');
+  if (!restoreFocus) {
+    customerState.suppressCategoryFocusRestore = true;
+  }
+
+  if (typeof dialog?.close === 'function') {
+    dialog.close();
+  } else {
+    dialog?.removeAttribute('open');
+    if (restoreFocus) {
+      restoreCustomerCategoryDialogFocus();
+    }
+  }
+
+  if (!restoreFocus) {
+    customerState.lastCategoryTrigger = null;
+  }
+}
+
 function renderRewardStamps(filledCount) {
   const stampsEl = document.getElementById('customer-rewards-stamps');
   if (!stampsEl) return;
@@ -2049,10 +2350,11 @@ function renderCustomerCategoryButtons() {
     button.setAttribute('tabindex', '0');
     button.innerHTML = `
       <span class="customer-category-label">${escapeHtml(t(CUSTOMER_CATEGORY_META[key].label))}</span>
-      <span class="customer-category-count">${count} item${count === 1 ? '' : 's'}</span>
+      <span class="customer-category-count">${count} ${count === 1 ? t('item') : t('items')}</span>
     `;
     button.addEventListener('click', () => {
       activateCustomerCategory(key);
+      openCustomerCategoryDialog(button);
     });
     button.addEventListener('keydown', (event) => {
       const currentIndex = CUSTOMER_CATEGORY_ORDER.indexOf(key);
@@ -2106,14 +2408,17 @@ function renderCustomerProducts() {
         <span class="section-label">${escapeHtml(t(item.category) || t(meta.label))}</span>
         <strong>${escapeHtml(t(item.name))}</strong>
         <span>${formatCurrency(item.price)}</span>
-        ${isDisabled ? '<span class="out-of-stock-label">Out of Stock</span>' : ''}
+        ${isDisabled ? `<span class="out-of-stock-label">${escapeHtml(t('Out of Stock'))}</span>` : ''}
       </span>
     `;
     tile.setAttribute('aria-label', isDisabled
-      ? `${t(item.name)}, ${formatCurrency(item.price)}. Out of stock.`
-      : `${t(item.name)}, ${formatCurrency(item.price)}. Open customization options.`);
+      ? `${t(item.name)}, ${formatCurrency(item.price)}. ${t('Out of stock.')}`
+      : `${t(item.name)}, ${formatCurrency(item.price)}. ${t('Open customization options.')}`);
     if (!isDisabled) {
-      tile.addEventListener('click', () => openCustomerDialog(item.id));
+      tile.addEventListener('click', () => {
+        closeCustomerCategoryDialog(false);
+        openCustomerDialog(item.id);
+      });
     }
     container.appendChild(tile);
   });
@@ -2180,9 +2485,7 @@ async function refreshCustomerPreview() {
     body: JSON.stringify({ items: customerState.cart.map(toOrderPayload) }),
   });
   customerState.preview = basePreview;
-  if (Array.isArray(basePreview.lineItems) && basePreview.lineItems.length === customerState.cart.length) {
-    customerState.cart = basePreview.lineItems.map((line) => ({ ...line }));
-  }
+  customerState.cart = mergePreviewLineItems(customerState.cart, basePreview.lineItems);
   customerState.rewardDiscount = getCustomerRewardDiscount();
 
   if (customerState.rewardDiscount > 0) {
@@ -2212,8 +2515,8 @@ function openCustomerDialog(productId) {
     return;
   }
   resetCustomerCustomizationForm();
-  setText('customer-dialog-title', product.name);
-  setText('customer-dialog-price', `Base price ${formatCurrency(product.price)}. Adjust size, sweetness, ice, and toppings.`);
+  setText('customer-dialog-title', t(product.name));
+  setText('customer-dialog-price', `${t('Base price')} ${formatCurrency(product.price)}. ${t('Adjust size, sweetness, ice, and toppings.')}`);
   const dialog = document.getElementById('customer-customize-dialog');
   if (typeof dialog.showModal === 'function') {
     dialog.showModal();
@@ -2332,12 +2635,11 @@ async function handleCustomerCheckout() {
     customerState.cart = [];
     customerState.preview = { ...EMPTY_PREVIEW };
     customerState.rewardDiscount = 0;
-    const productsData = await fetchJson('/api/products');
-    customerState.products = productsData.items || [];
     renderCustomerRewards();
     renderCustomerCategoryButtons();
     renderCustomerProducts();
     renderCustomerCart();
+    refreshCustomerProductsInBackground();
     setStatus(
       'customer-cart-status',
       (rewardUsed ? 'Order placed. Your free drink reward was applied.' : 'Order placed. Rewards progress has been updated.') + rewardsMessage,
@@ -2390,6 +2692,9 @@ function attachCustomerEventHandlers() {
   });
   document.getElementById('customer-qty').addEventListener('input', (event) => {
     setCustomerQuantity(event.target.value);
+  });
+  document.getElementById('customer-sugar')?.addEventListener('input', (event) => {
+    setText('customer-sugar-value', `${event.target.value}%`);
   });
   document.getElementById('customer-phone')?.addEventListener('input', (event) => {
     event.target.value = formatCustomerPhoneNumber(event.target.value);
@@ -2519,6 +2824,41 @@ function attachCustomerEventHandlers() {
       first.focus();
     }
   });
+  document.getElementById('customer-close-category-dialog')?.addEventListener('click', () => closeCustomerCategoryDialog());
+  document.getElementById('customer-category-dialog')?.addEventListener('close', restoreCustomerCategoryDialogFocus);
+  document.getElementById('customer-category-dialog')?.addEventListener('keydown', (event) => {
+    const dialog = event.currentTarget;
+    if (!dialog.hasAttribute('open')) {
+      return;
+    }
+
+    if (event.key === 'Escape' && typeof dialog.showModal !== 'function') {
+      event.preventDefault();
+      closeCustomerCategoryDialog();
+      return;
+    }
+
+    if (event.key !== 'Tab') {
+      return;
+    }
+
+    const focusableElements = getCustomerCategoryDialogFocusableElements();
+    if (!focusableElements.length) {
+      return;
+    }
+
+    const first = focusableElements[0];
+    const last = focusableElements[focusableElements.length - 1];
+    const activeElement = document.activeElement;
+
+    if (event.shiftKey && activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  });
   document.getElementById('customer-checkout').addEventListener('click', handleCustomerCheckout);
   document.getElementById('customer-close-dialog').addEventListener('click', closeCustomerDialog);
   document.getElementById('customer-customize-dialog').addEventListener('close', restoreCustomerDialogFocus);
@@ -2572,6 +2912,7 @@ async function bootCustomer() {
     accessibilityPanel.hidden = true;
   }
   setupCustomerRewardsDialog();
+  setupCustomerCategoryDialog();
   customerState.highContrast = loadCustomerContrastPreference();
   customerState.textScale = loadCustomerTextScalePreference();
   customerState.zoomScale = loadCustomerZoomPreference();
@@ -2584,7 +2925,7 @@ async function bootCustomer() {
   attachCustomerEventHandlers();
   attachChatEventHandlers();
 
-  setStatus('customer-products-status', 'Loading live menu from the database...', 'neutral');
+  setStatus('customer-products-status', 'Loading live menu from the database...', 'loading');
   const data = await fetchJson('/api/products');
   customerState.products = data.items || [];
 

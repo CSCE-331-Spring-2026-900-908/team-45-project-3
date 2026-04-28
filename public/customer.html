@@ -132,7 +132,6 @@
           <div class="section-heading">
             <div>
               <p class="section-label" data-i18n="Categories">Categories</p>
-              <h2 id="customer-menu-heading" data-i18n="Choose a drink family">Choose a drink family</h2>
             </div>
             <p id="customer-products-status" class="status-text" data-tone="neutral">
               Loading menu...
@@ -143,7 +142,7 @@
             aria-label="Menu categories"></div>
         </section>
 
-        <section class="content-card">
+        <section id="customer-category-products-panel" class="content-card customer-category-products-panel" hidden>
           <div class="section-heading">
             <div>
               <p class="section-label" data-i18n="Live Menu">Live Menu</p>
@@ -160,8 +159,6 @@
       <aside id="customer-cart-panel" class="content-card customer-cart-panel" aria-labelledby="customer-cart-heading">
         <p class="section-label" data-i18n="Shopping Cart">Shopping Cart</p>
         <h2 id="customer-cart-heading" data-i18n="Your order">Your order</h2>
-        <p class="muted-line" data-i18n="This cart stays visible while you browse.">This cart stays visible while you
-          browse.</p>
 
         <div id="customer-reward-banner" class="customer-reward-banner" hidden></div>
         <div id="customer-cart-lines" class="cart-list"></div>
@@ -180,10 +177,7 @@
             Order</button>
         </div>
 
-        <p id="customer-cart-status" class="status-text" data-tone="neutral"
-          data-i18n="Choose an item to start building your order.">
-          Choose an item to start building your order.
-        </p>
+
       </aside>
     </main>
   </div>
@@ -198,7 +192,7 @@
           <p id="customer-dialog-price" class="muted-line"></p>
         </div>
         <button id="customer-close-dialog" class="ghost-button mini-button" type="button"
-          aria-label="Close customization dialog">
+          aria-label="Close customization dialog" data-i18n="Close">
           Close
         </button>
       </div>
@@ -211,7 +205,8 @@
               aria-label="Decrease quantity">
               -
             </button>
-            <input id="customer-qty" name="quantity" class="numeric-input" type="number" min="1" value="1" />
+            <input id="customer-qty" name="quantity" class="numeric-input" type="number" min="1" value="1" readonly
+              inputmode="none" aria-live="polite" />
             <button id="customer-qty-increment" class="ghost-button mini-button quantity-stepper-button" type="button"
               aria-label="Increase quantity">
               +
@@ -222,26 +217,16 @@
         <fieldset class="field-block">
           <legend data-i18n="Size">Size</legend>
           <div class="customer-choice-grid">
-            <label><input type="radio" name="customer-size" value="Small" /> Small</label>
-            <label><input type="radio" name="customer-size" value="Medium" checked /> Medium</label>
-            <label><input type="radio" name="customer-size" value="Large" /> Large</label>
+            <label><input type="radio" name="customer-size" value="Small" /> <span data-i18n="Small">Small</span></label>
+            <label><input type="radio" name="customer-size" value="Medium" checked /> <span data-i18n="Medium">Medium</span></label>
+            <label><input type="radio" name="customer-size" value="Large" /> <span data-i18n="Large">Large</span></label>
           </div>
         </fieldset>
 
-        <fieldset class="field-block">
-          <legend data-i18n="Sweetness">Sweetness</legend>
-          <div class="customer-choice-grid">
-            <label><input type="radio" name="customer-sugar" value="0" /> 0%</label>
-            <label><input type="radio" name="customer-sugar" value="25" /> 25%</label>
-            <label><input type="radio" name="customer-sugar" value="50" checked /> 50%</label>
-            <label><input type="radio" name="customer-sugar" value="75" /> 75%</label>
-            <label><input type="radio" name="customer-sugar" value="100" /> 100%</label>
-            <label><input type="radio" name="customer-sugar" value="125" /> 125%</label>
-            <label><input type="radio" name="customer-sugar" value="150" /> 150%</label>
-            <label><input type="radio" name="customer-sugar" value="175" /> 175%</label>
-            <label><input type="radio" name="customer-sugar" value="200" /> 200%</label>
-          </div>
-        </fieldset>
+        <label class="field-block">
+          <span><span data-i18n="Sweetness">Sweetness</span>: <strong id="customer-sugar-value">50%</strong></span>
+          <input id="customer-sugar" type="range" min="0" max="200" step="25" value="50" />
+        </label>
 
         <fieldset class="field-block">
           <legend data-i18n="Ice Level">Ice Level</legend>
@@ -251,6 +236,7 @@
             <label><input type="radio" name="customer-ice" value="50" checked /> 50%</label>
             <label><input type="radio" name="customer-ice" value="75" /> 75%</label>
             <label><input type="radio" name="customer-ice" value="100" /> 100%</label>
+            <label><input type="radio" name="customer-ice" value="200" /> <span data-i18n="Hot">Hot</span></label>
           </div>
         </fieldset>
 
@@ -272,8 +258,7 @@
           <button id="customer-add-to-cart" class="action-button" type="submit" data-i18n="Add To Cart">Add To
             Cart</button>
         </div>
-        <p id="customer-dialog-help" class="muted-line">All options are keyboard accessible and remain readable for
-          translation tools.</p>
+
       </div>
     </form>
   </dialog>

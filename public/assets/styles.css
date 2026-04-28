@@ -115,8 +115,27 @@ h1 { font-size: clamp(2.4rem, 6vw, 4.6rem); line-height: 0.96; max-width: 12ch; 
 .toolbar-note, .muted-line, .list-meta { color: var(--muted); font-size: 0.94rem; }
 .status-text { margin: 14px 0 0; font-size: 0.96rem; }
 .status-text[data-tone='neutral'] { color: var(--muted); }
+.status-text[data-tone='loading'] { color: var(--accent-dark); }
 .status-text[data-tone='success'] { color: #2b6b46; }
 .status-text[data-tone='error'] { color: #9a3d2a; }
+.status-text.is-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.status-text.is-loading::before {
+  content: '';
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  border-radius: 999px;
+  border: 3px solid rgba(181, 93, 61, 0.24);
+  border-top-color: var(--accent-dark);
+  animation: status-spin 0.8s linear infinite;
+}
+@keyframes status-spin {
+  to { transform: rotate(360deg); }
+}
 .feature-list { padding-left: 18px; color: var(--muted); line-height: 1.7; }
 .product-list { display: grid; gap: 14px; }
 .product-card { padding: 16px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface-strong); }
@@ -267,6 +286,17 @@ h1 { font-size: clamp(2.4rem, 6vw, 4.6rem); line-height: 0.96; max-width: 12ch; 
 .quantity-stepper-button {
   min-width: 72px;
   justify-self: stretch;
+}
+#staff-workspace .quantity-stepper {
+  grid-template-columns: 44px minmax(44px, 1fr) 44px;
+  gap: 6px;
+}
+#staff-workspace .quantity-stepper-button {
+  min-width: 44px;
+  padding: 8px 10px;
+}
+.staff-customization-grid {
+  grid-template-columns: 1fr;
 }
 @media (max-width: 900px) {
   .compact-form,
@@ -813,16 +843,16 @@ h1 { font-size: clamp(2.4rem, 6vw, 4.6rem); line-height: 0.96; max-width: 12ch; 
 }
 .customer-product-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
 }
 .customer-product-tile {
   position: relative;
-  min-height: 220px;
+  min-height: 132px;
   overflow: hidden;
   border: 0;
-  border-radius: 24px;
-  padding: 18px;
+  border-radius: 16px;
+  padding: 12px;
   cursor: pointer;
   color: white;
   text-align: left;
@@ -861,22 +891,27 @@ h1 { font-size: clamp(2.4rem, 6vw, 4.6rem); line-height: 0.96; max-width: 12ch; 
 }
 .customer-product-overlay {
   position: absolute;
-  inset: auto 18px 18px 18px;
+  inset: 12px;
   z-index: 2;
   display: grid;
-  gap: 6px;
+  grid-template-rows: auto 1fr auto auto;
+  align-content: stretch;
+  gap: 4px;
   text-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
 }
 .customer-product-overlay .section-label {
   margin-bottom: 0;
   color: rgba(255, 248, 232, 0.95);
+  align-self: start;
+  justify-self: start;
 }
 .customer-product-overlay span:last-child {
   color: rgba(255, 255, 255, 0.96);
 }
 .customer-product-overlay strong {
-  font-size: 1.4rem;
+  font-size: 1.02rem;
   line-height: 1.1;
+  align-self: end;
 }
 .customer-cart-panel {
   position: sticky;
@@ -907,6 +942,12 @@ h1 { font-size: clamp(2.4rem, 6vw, 4.6rem); line-height: 0.96; max-width: 12ch; 
 .customer-rewards-dialog {
   width: min(760px, calc(100% - 24px));
 }
+.customer-category-dialog {
+  width: min(860px, calc(100% - 24px));
+}
+.staff-customization-dialog {
+  width: min(520px, calc(100% - 24px));
+}
 .customer-dialog::backdrop {
   background: rgba(36, 23, 21, 0.48);
 }
@@ -919,6 +960,13 @@ h1 { font-size: clamp(2.4rem, 6vw, 4.6rem); line-height: 0.96; max-width: 12ch; 
 .customer-rewards-panel {
   display: grid;
   gap: 18px;
+}
+.staff-customization-panel {
+  display: grid;
+  gap: 14px;
+}
+.staff-customization-close {
+  justify-self: end;
 }
 .customer-choice-grid {
   display: grid;
@@ -993,6 +1041,11 @@ body.high-contrast .eyebrow {
 body.high-contrast .customer-stamp-filled {
   background: #ffd400 !important;
   border-color: #ffffff !important;
+}
+
+body.high-contrast .status-text.is-loading::before {
+  border-color: #ffffff !important;
+  border-top-color: #ffd400 !important;
 }
 
 body.high-contrast .customer-choice-grid label,
@@ -1378,7 +1431,7 @@ body.high-contrast .chat-input {
 }
 .staff-dashboard-grid {
   display: grid;
-  grid-template-columns: 1.4fr 0.9fr 1fr;
+  grid-template-columns: 1.4fr 1fr;
   gap: 12px;
   /* Reduced height to account for taskbars and headers */
   height: calc(100vh - 140px); 
