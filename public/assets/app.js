@@ -21,7 +21,8 @@ const CUSTOMER_TEXT_SIZE_KEY = 'customerTextScale';
 const CUSTOMER_ZOOM_KEY = 'customerZoomScale';
 const CUSTOMER_PHONE_DIGIT_PATTERN = /\d/g;
 const CUSTOMER_PHONE_NUMBER_LENGTH = 10;
-const CUSTOMER_CATEGORY_ORDER = ['boba-tea', 'milk-tea', 'tea', 'seasonal'];
+const CUSTOMER_CATEGORY_ORDER = ['boba-tea', 'milk-tea', 'slushy', 'tea', 'seasonal'];
+
 const CUSTOMER_CATEGORY_META = {
   'boba-tea': {
     label: 'Boba Tea',
@@ -31,11 +32,16 @@ const CUSTOMER_CATEGORY_META = {
     label: 'Milk Tea',
     description: 'Creamy classics and rich house favorites.',
   },
-  tea: {
+  // Add this new block!
+  'slushy': {
+    label: 'Slushies',
+    description: 'Ice-blended drinks perfect for beating the heat.',
+  },
+  'tea': {
     label: 'Tea',
     description: 'Fresh teas, fruit blends, and lighter refreshers.',
   },
-  seasonal: {
+  'seasonal': {
     label: 'Seasonal',
     description: 'Limited-time drinks and rotating specials from the live menu.',
   },
@@ -1968,8 +1974,13 @@ function setCustomerAccessibilityPanelOpen(isOpen) {
 
 function normalizeCustomerCategory(product) {
   const source = `${product.category || ''} ${product.name || ''}`.toLowerCase();
+  
   if (source.includes('season') || source.includes('limited') || source.includes('holiday') || source.includes('special')) {
     return 'seasonal';
+  }
+  // Add this block to catch your new Slushy category
+  if (source.includes('slush')) {
+    return 'slushy';
   }
   if (source.includes('milk')) {
     return 'milk-tea';

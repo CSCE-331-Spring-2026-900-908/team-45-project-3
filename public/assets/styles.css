@@ -841,6 +841,19 @@ h1 { font-size: clamp(2.4rem, 6vw, 4.6rem); line-height: 0.96; max-width: 12ch; 
   color: rgba(255, 255, 255, 0.96);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
+/* Add to standard colors */
+.customer-category-slushy {
+  background: linear-gradient(160deg, #4b7b8c, #6eb5c0 60%, #b8e1e6);
+}
+.customer-tile-slushy {
+  background: linear-gradient(145deg, #5b9db0 0%, #3a7587 48%, #1f4a57 100%);
+}
+
+/* Add to High Contrast overrides (around line 610) */
+body.high-contrast .customer-category-slushy,
+body.high-contrast .customer-tile-slushy {
+  background: #00ffff !important; /* Cyan for slushies */
+}
 .customer-product-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
