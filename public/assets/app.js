@@ -46,6 +46,7 @@ const customerState = {
   cart: [],
   preview: { ...EMPTY_PREVIEW },
   rewardDiscount: 0,
+  rewardCreditApplied: false,
   profile: null,
   selectedProductId: null,
   highContrast: false,
@@ -108,6 +109,23 @@ const JS_STATIC_STRINGS = [
   'All options are keyboard accessible and remain readable for translation tools.',
   'No products are available in this category right now.',
   'Your cart is empty. Pick a drink to customize and add it here.',
+  'Submitting',
+  'Ordered',
+  'Recommendation',
+  'Rewards program?',
+  'Customization?',
+  'Reward Status',
+  'Apply Credit',
+  'Credit Applied',
+  'Remove Credit',
+  'Sign in to rewards to track progress and use free drink credits.',
+  'Add an item to your cart to use rewards.',
+  'No free drink credits available yet.',
+  'Free drink credit available.',
+  'Free drink credit applied.',
+  'Free drink credit removed.',
+  'credit',
+  'credits',
 ];
 
 function collectAllTranslatableStrings() {
@@ -2002,7 +2020,7 @@ function getCustomerRewardProgress(profile = customerState.profile) {
 }
 
 function getCustomerRewardDiscount() {
-  if (!customerState.profile || !customerState.cart.length || customerState.profile.freeDrinkCredits <= 0) {
+  if (!customerState.rewardCreditApplied || !customerState.profile || !customerState.cart.length || customerState.profile.freeDrinkCredits <= 0) {
     return 0;
   }
   const cheapestLine = customerState.cart.reduce((lowest, line) => {
@@ -2012,6 +2030,61 @@ function getCustomerRewardDiscount() {
     return lowest;
   }, null);
   return cheapestLine ? Number(cheapestLine.unitPrice) : 0;
+}
+
+function renderCustomerCartRewardStatus() {
+  const status = document.getElementById('customer-cart-rewards-status');
+  const button = document.getElementById('customer-apply-credit');
+  const stamps = document.getElementById('customer-cart-rewards-stamps');
+  const bar = document.getElementById('customer-cart-rewards-bar');
+  const meta = document.getElementById('customer-cart-rewards-meta');
+  if (!status || !button) {
+    return;
+  }
+
+  const credits = Number(customerState.profile?.freeDrinkCredits || 0);
+  const reward = getCustomerRewardProgress();
+  button.hidden = false;
+  button.disabled = true;
+  setCustomerCheckoutButtonLabel(button, 'Apply Credit');
+  if (stamps) {
+    stamps.innerHTML = Array.from({ length: 5 }, (_, i) =>
+      `<span class="customer-stamp${customerState.profile && i < reward.progress ? ' customer-stamp-filled' : ''}"></span>`
+    ).join('');
+  }
+  if (bar) {
+    bar.style.width = customerState.profile ? `${(reward.progress / 5) * 100}%` : '0%';
+  }
+  if (meta) {
+    meta.textContent = customerState.profile
+      ? `${reward.progress} ${t('of 5 orders completed toward next reward')}`
+      : t('0 of 5 orders completed');
+  }
+
+  if (!customerState.profile) {
+    status.textContent = t('Sign in to rewards to track progress and use free drink credits.');
+    return;
+  }
+
+  if (!customerState.cart.length) {
+    status.textContent = t('Add an item to your cart to use rewards.');
+    return;
+  }
+
+  if (credits <= 0) {
+    status.textContent = t('No free drink credits available yet.');
+    return;
+  }
+
+  if (customerState.rewardDiscount > 0) {
+    status.textContent = `${t('Free drink credit applied.')} ${t('Rewards')} -${formatCurrency(customerState.rewardDiscount)}`;
+    button.disabled = false;
+    setCustomerCheckoutButtonLabel(button, 'Remove Credit');
+    return;
+  }
+
+  status.textContent = `${t('Free drink credit available.')} ${credits} ${credits === 1 ? t('credit') : t('credits')}`;
+  button.disabled = false;
 }
 
 function readCustomerCustomizationForm() {
@@ -2059,6 +2132,31 @@ function adjustCustomerQuantity(delta) {
   }
 
   setCustomerQuantity((Number(quantityInput.value) || 1) + delta);
+}
+
+function setCustomerCheckoutButtonLabel(button, label) {
+  if (!button) {
+    return;
+  }
+
+  button.dataset.i18n = label;
+  button.textContent = t(label);
+}
+
+function showCustomerCheckoutSuccess(button) {
+  if (!button) {
+    return;
+  }
+
+  window.clearTimeout(customerState.checkoutSuccessTimer);
+  button.classList.remove('customer-checkout-submitting', 'customer-checkout-success');
+  setCustomerCheckoutButtonLabel(button, 'Ordered');
+  void button.offsetWidth;
+  button.classList.add('customer-checkout-success');
+  customerState.checkoutSuccessTimer = window.setTimeout(() => {
+    button.classList.remove('customer-checkout-success');
+    setCustomerCheckoutButtonLabel(button, 'Place Order');
+  }, 1400);
 }
 
 function getCustomerDialogFocusableElements() {
@@ -2458,6 +2556,7 @@ function renderCustomerCart() {
   setText('customer-tax', formatCurrency(customerState.preview.tax));
   setText('customer-discount', customerState.rewardDiscount > 0 ? `-${formatCurrency(customerState.rewardDiscount)}` : formatCurrency(0));
   setText('customer-total', formatCurrency(customerState.preview.total));
+  renderCustomerCartRewardStatus();
 
   const rewardBanner = document.getElementById('customer-reward-banner');
   const credits = customerState.profile ? (customerState.profile.freeDrinkCredits || 0) : 0;
@@ -2474,6 +2573,7 @@ async function refreshCustomerPreview() {
   if (!customerState.cart.length) {
     customerState.preview = { ...EMPTY_PREVIEW };
     customerState.rewardDiscount = 0;
+    customerState.rewardCreditApplied = false;
     renderCustomerCart();
     return;
   }
@@ -2583,7 +2683,11 @@ async function handleCustomerCheckout() {
   customerState.isSubmittingOrder = true;
   const checkoutButton = document.getElementById('customer-checkout');
   if (checkoutButton) {
+    window.clearTimeout(customerState.checkoutSuccessTimer);
     checkoutButton.disabled = true;
+    checkoutButton.classList.remove('customer-checkout-success');
+    checkoutButton.classList.add('customer-checkout-submitting');
+    setCustomerCheckoutButtonLabel(checkoutButton, 'Submitting');
   }
   setStatus('customer-cart-status', 'Submitting your order...', 'neutral');
   try {
@@ -2635,6 +2739,7 @@ async function handleCustomerCheckout() {
     customerState.cart = [];
     customerState.preview = { ...EMPTY_PREVIEW };
     customerState.rewardDiscount = 0;
+    customerState.rewardCreditApplied = false;
     renderCustomerRewards();
     renderCustomerCategoryButtons();
     renderCustomerProducts();
@@ -2645,12 +2750,15 @@ async function handleCustomerCheckout() {
       (rewardUsed ? 'Order placed. Your free drink reward was applied.' : 'Order placed. Rewards progress has been updated.') + rewardsMessage,
       'success'
     );
+    showCustomerCheckoutSuccess(checkoutButton);
   } catch (error) {
     setStatus('customer-cart-status', error.message || 'Unable to submit your order.', 'error');
+    setCustomerCheckoutButtonLabel(checkoutButton, 'Place Order');
   } finally {
     customerState.isSubmittingOrder = false;
     if (checkoutButton) {
       checkoutButton.disabled = false;
+      checkoutButton.classList.remove('customer-checkout-submitting');
     }
   }
 }
@@ -2730,7 +2838,8 @@ function attachCustomerEventHandlers() {
       });
       saveCustomerProfile(result.profile);
       renderCustomerRewards();
-      customerState.rewardDiscount = getCustomerRewardDiscount();
+      customerState.rewardCreditApplied = false;
+      customerState.rewardDiscount = 0;
       if (customerState.cart.length) {
         await refreshCustomerPreview();
       } else {
@@ -2753,7 +2862,8 @@ function attachCustomerEventHandlers() {
       });
       saveCustomerProfile(result.profile);
       renderCustomerRewards();
-      customerState.rewardDiscount = getCustomerRewardDiscount();
+      customerState.rewardCreditApplied = false;
+      customerState.rewardDiscount = 0;
       if (customerState.cart.length) {
         await refreshCustomerPreview();
       } else {
@@ -2772,7 +2882,8 @@ function attachCustomerEventHandlers() {
     });
     clearCustomerProfile();
     renderCustomerRewards();
-    customerState.rewardDiscount = getCustomerRewardDiscount();
+    customerState.rewardCreditApplied = false;
+    customerState.rewardDiscount = 0;
     if (customerState.cart.length) {
       await refreshCustomerPreview();
     } else {
@@ -2789,6 +2900,29 @@ function attachCustomerEventHandlers() {
   });
 
   document.getElementById('customer-open-rewards')?.addEventListener('click', openCustomerRewardsDialog);
+  document.getElementById('customer-apply-credit')?.addEventListener('click', async () => {
+    if (!customerState.profile) {
+      openCustomerRewardsDialog();
+      return;
+    }
+
+    if (customerState.rewardCreditApplied) {
+      customerState.rewardCreditApplied = false;
+      customerState.rewardDiscount = 0;
+      await refreshCustomerPreview();
+      setStatus('customer-cart-status', 'Free drink credit removed.', 'neutral');
+      return;
+    }
+
+    if (!customerState.cart.length || Number(customerState.profile.freeDrinkCredits || 0) <= 0) {
+      renderCustomerCart();
+      return;
+    }
+
+    customerState.rewardCreditApplied = true;
+    await refreshCustomerPreview();
+    setStatus('customer-cart-status', 'Free drink credit applied.', 'success');
+  });
   document.getElementById('customer-close-rewards-dialog')?.addEventListener('click', closeCustomerRewardsDialog);
   document.getElementById('customer-rewards-dialog')?.addEventListener('close', restoreCustomerRewardsDialogFocus);
   document.getElementById('customer-rewards-dialog')?.addEventListener('keydown', (event) => {
@@ -3036,8 +3170,12 @@ function setChatBusy(busy) {
   chatState.busy = busy;
   const input = document.getElementById('chat-input');
   const send = document.getElementById('chat-send');
+  const quickOptions = document.querySelectorAll('.chat-quick-option');
   if (input) input.disabled = busy;
   if (send) send.disabled = busy;
+  quickOptions.forEach((button) => {
+    button.disabled = busy;
+  });
 }
 
 async function sendChatMessage(userText) {
@@ -3103,6 +3241,7 @@ function attachChatEventHandlers() {
   const closeBtn = document.getElementById('chat-close');
   const form = document.getElementById('chat-form');
   const input = document.getElementById('chat-input');
+  const quickOptions = document.querySelectorAll('.chat-quick-option');
 
   if (!toggle) return; // not on customer page
 
@@ -3118,6 +3257,15 @@ function attachChatEventHandlers() {
     const text = input?.value || '';
     if (input) input.value = '';
     await sendChatMessage(text);
+  });
+
+  quickOptions.forEach((button) => {
+    button.addEventListener('click', async () => {
+      if (!chatState.open) {
+        openChatWidget();
+      }
+      await sendChatMessage(button.dataset.chatPrompt || button.textContent || '');
+    });
   });
 
   // Close on Escape when widget is open
