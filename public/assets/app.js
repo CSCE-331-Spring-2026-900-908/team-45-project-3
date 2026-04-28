@@ -51,6 +51,7 @@ const customerState = {
   textScale: 1,
   zoomScale: 1,
   lastDialogTrigger: null,
+  lastRewardsTrigger: null,
   isSubmittingOrder: false,
 };
 // ── Translation ───────────────────────────────────────────────────────────────
@@ -1887,6 +1888,91 @@ function restoreCustomerDialogFocus() {
   document.querySelector('.customer-category-button.active, .customer-product-tile')?.focus();
 }
 
+function setupCustomerRewardsDialog() {
+  const panel = document.getElementById('customer-rewards-panel');
+  if (!panel || document.getElementById('customer-rewards-dialog')) {
+    return;
+  }
+
+  const dialog = document.createElement('dialog');
+  dialog.id = 'customer-rewards-dialog';
+  dialog.className = 'customer-dialog customer-rewards-dialog';
+  dialog.setAttribute('aria-labelledby', 'customer-rewards-dialog-title');
+  dialog.setAttribute('aria-describedby', 'customer-rewards-dialog-help');
+  dialog.setAttribute('aria-modal', 'true');
+  dialog.setAttribute('translate', 'yes');
+
+  panel.hidden = false;
+  panel.classList.remove('content-card');
+  panel.classList.add('customer-dialog-form');
+
+  const heading = panel.querySelector('.section-heading');
+  const closeButton = document.createElement('button');
+  closeButton.id = 'customer-close-rewards-dialog';
+  closeButton.className = 'ghost-button mini-button';
+  closeButton.type = 'button';
+  closeButton.setAttribute('aria-label', 'Close rewards login dialog');
+  closeButton.dataset.i18n = 'Close';
+  closeButton.textContent = t('Close');
+  heading?.appendChild(closeButton);
+
+  const helpText = panel.querySelector('.muted-line');
+  if (helpText) {
+    helpText.id = 'customer-rewards-dialog-help';
+  }
+
+  dialog.appendChild(panel);
+  document.body.insertBefore(dialog, document.getElementById('customer-customize-dialog'));
+}
+
+function getCustomerRewardsDialogFocusableElements() {
+  const dialog = document.getElementById('customer-rewards-dialog');
+  if (!dialog) {
+    return [];
+  }
+
+  return Array.from(dialog.querySelectorAll(
+    'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+  )).filter((element) => !element.hasAttribute('hidden'));
+}
+
+function openCustomerRewardsDialog() {
+  customerState.lastRewardsTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const dialog = document.getElementById('customer-rewards-dialog');
+  if (!dialog) {
+    return;
+  }
+
+  if (typeof dialog.showModal === 'function') {
+    dialog.showModal();
+  } else {
+    dialog.setAttribute('open', 'true');
+  }
+
+  document.getElementById('customer-phone')?.focus();
+}
+
+function restoreCustomerRewardsDialogFocus() {
+  const lastTrigger = customerState.lastRewardsTrigger;
+  customerState.lastRewardsTrigger = null;
+  if (lastTrigger && document.contains(lastTrigger)) {
+    lastTrigger.focus();
+    return;
+  }
+
+  document.getElementById('customer-open-rewards')?.focus();
+}
+
+function closeCustomerRewardsDialog() {
+  const dialog = document.getElementById('customer-rewards-dialog');
+  if (typeof dialog?.close === 'function') {
+    dialog.close();
+  } else {
+    dialog?.removeAttribute('open');
+    restoreCustomerRewardsDialogFocus();
+  }
+}
+
 function renderRewardStamps(filledCount) {
   const stampsEl = document.getElementById('customer-rewards-stamps');
   if (!stampsEl) return;
@@ -2397,7 +2483,42 @@ function attachCustomerEventHandlers() {
     setStatus('customer-products-status', lang === 'en' ? 'English restored.' : 'Translation applied.', 'success');
   });
 
-  document.getElementById('customer-preview-order').addEventListener('click', refreshCustomerPreview);
+  document.getElementById('customer-open-rewards')?.addEventListener('click', openCustomerRewardsDialog);
+  document.getElementById('customer-close-rewards-dialog')?.addEventListener('click', closeCustomerRewardsDialog);
+  document.getElementById('customer-rewards-dialog')?.addEventListener('close', restoreCustomerRewardsDialogFocus);
+  document.getElementById('customer-rewards-dialog')?.addEventListener('keydown', (event) => {
+    const dialog = event.currentTarget;
+    if (!dialog.hasAttribute('open')) {
+      return;
+    }
+
+    if (event.key === 'Escape' && typeof dialog.showModal !== 'function') {
+      event.preventDefault();
+      closeCustomerRewardsDialog();
+      return;
+    }
+
+    if (event.key !== 'Tab') {
+      return;
+    }
+
+    const focusableElements = getCustomerRewardsDialogFocusableElements();
+    if (!focusableElements.length) {
+      return;
+    }
+
+    const first = focusableElements[0];
+    const last = focusableElements[focusableElements.length - 1];
+    const activeElement = document.activeElement;
+
+    if (event.shiftKey && activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  });
   document.getElementById('customer-checkout').addEventListener('click', handleCustomerCheckout);
   document.getElementById('customer-close-dialog').addEventListener('click', closeCustomerDialog);
   document.getElementById('customer-customize-dialog').addEventListener('close', restoreCustomerDialogFocus);
@@ -2450,6 +2571,7 @@ async function bootCustomer() {
     accessibilityPanel.id = 'customer-accessibility-panel';
     accessibilityPanel.hidden = true;
   }
+  setupCustomerRewardsDialog();
   customerState.highContrast = loadCustomerContrastPreference();
   customerState.textScale = loadCustomerTextScalePreference();
   customerState.zoomScale = loadCustomerZoomPreference();

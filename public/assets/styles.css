@@ -899,6 +899,13 @@ h1 { font-size: clamp(2.4rem, 6vw, 4.6rem); line-height: 0.96; max-width: 12ch; 
   border-radius: 28px;
   padding: 0;
   box-shadow: 0 30px 80px rgba(20, 14, 10, 0.38);
+  max-height: min(90vh, 900px);
+  overflow: auto;
+  transform: scale(var(--customer-zoom-scale));
+  transform-origin: center;
+}
+.customer-rewards-dialog {
+  width: min(760px, calc(100% - 24px));
 }
 .customer-dialog::backdrop {
   background: rgba(36, 23, 21, 0.48);
@@ -908,6 +915,10 @@ h1 { font-size: clamp(2.4rem, 6vw, 4.6rem); line-height: 0.96; max-width: 12ch; 
   background:
     radial-gradient(circle at top right, rgba(240, 199, 162, 0.35), transparent 22%),
     var(--surface-strong);
+}
+.customer-rewards-panel {
+  display: grid;
+  gap: 18px;
 }
 .customer-choice-grid {
   display: grid;
@@ -953,6 +964,7 @@ body.high-contrast .product-card,
 body.high-contrast .cart-row,
 body.high-contrast .report-chart-card,
 body.high-contrast .report-table-card,
+body.high-contrast .customer-dialog,
 body.high-contrast .customer-dialog-form,
 body.high-contrast .customer-stamp,
 body.high-contrast .forecast-card,

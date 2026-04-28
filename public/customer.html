@@ -65,11 +65,11 @@
 
     <main class="customer-layout">
       <section class="customer-main stack-layout" aria-labelledby="customer-menu-heading">
-        <section class="content-card">
+        <section id="customer-rewards-panel" class="content-card customer-rewards-panel" hidden>
           <div class="section-heading">
             <div>
               <p class="section-label" data-i18n="Rewards Login">Rewards Login</p>
-              <h2 id="customer-menu-heading" data-i18n="Welcome to the menu">Welcome to the menu</h2>
+              <h2 id="customer-rewards-dialog-title" data-i18n="Welcome to the menu">Welcome to the menu</h2>
               <p class="muted-line"
                 data-i18n="Sign in with your phone number to track the free-drink reward on every 5th order.">
                 Sign in with your phone number to track the free-drink reward on every 5th order.
@@ -132,7 +132,7 @@
           <div class="section-heading">
             <div>
               <p class="section-label" data-i18n="Categories">Categories</p>
-              <h2 data-i18n="Choose a drink family">Choose a drink family</h2>
+              <h2 id="customer-menu-heading" data-i18n="Choose a drink family">Choose a drink family</h2>
             </div>
             <p id="customer-products-status" class="status-text" data-tone="neutral">
               Loading menu...
@@ -174,8 +174,8 @@
         </div>
 
         <div class="button-row">
-          <button id="customer-preview-order" class="ghost-button" type="button" data-i18n="Refresh Total">Refresh
-            Total</button>
+          <button id="customer-open-rewards" class="ghost-button" type="button" data-i18n="Rewards Login">Rewards
+            Login</button>
           <button id="customer-checkout" class="action-button" type="button" data-i18n="Place Order">Place
             Order</button>
         </div>
