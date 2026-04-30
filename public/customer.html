@@ -309,6 +309,60 @@
     <span class="customer-accessibility-fab-icon" aria-hidden="true">♿</span>
   </button>
 
+  <!-- Payment Method Dialog -->
+  <dialog id="customer-payment-dialog" class="customer-dialog customer-payment-dialog"
+    aria-labelledby="customer-payment-dialog-title" aria-modal="true">
+    <div class="customer-dialog-form">
+      <div class="section-heading">
+        <div>
+          <p class="section-label" data-i18n="Payment">Payment</p>
+          <h2 id="customer-payment-dialog-title" data-i18n="How are you paying?">How are you paying?</h2>
+          <p id="customer-payment-dialog-total" class="muted-line"></p>
+        </div>
+        <button id="customer-close-payment-dialog" class="ghost-button mini-button" type="button"
+          aria-label="Close payment dialog" data-i18n="Close">Close</button>
+      </div>
+
+      <div id="customer-payment-step-select" class="stack-layout compact-gap">
+        <div class="customer-payment-options">
+          <button id="customer-pay-card" class="customer-payment-option-button" type="button">
+            <span class="customer-payment-option-icon" aria-hidden="true">💳</span>
+            <span data-i18n="Credit Card">Credit Card</span>
+          </button>
+          <button id="customer-pay-cash" class="customer-payment-option-button" type="button">
+            <span class="customer-payment-option-icon" aria-hidden="true">💵</span>
+            <span data-i18n="Cash">Cash</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="customer-payment-step-cash" class="stack-layout compact-gap" hidden>
+        <div class="customer-cash-instructions">
+          <p class="customer-cash-instructions-icon" aria-hidden="true">🧾</p>
+          <p class="customer-cash-instructions-text"
+            data-i18n="Please proceed to the cashier to complete your payment.">
+            Please proceed to the cashier to complete your payment.
+          </p>
+        </div>
+        <div class="button-row">
+          <button id="customer-cash-back" class="ghost-button" type="button" data-i18n="Back">Back</button>
+          <button id="customer-cash-confirm" class="action-button" type="button"
+            data-i18n="Confirm Order">Confirm Order</button>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Order Success Overlay -->
+  <div id="customer-order-success-overlay" class="customer-order-success-overlay" hidden aria-live="polite"
+    aria-label="Order placed successfully">
+    <div class="customer-order-success-content">
+      <span class="customer-order-success-icon" aria-hidden="true">🧋</span>
+      <p class="customer-order-success-title" data-i18n="Order Placed!">Order Placed!</p>
+      <p class="customer-order-success-message" data-i18n="Your drink is on its way.">Your drink is on its way.</p>
+    </div>
+  </div>
+
   <script src="/assets/app.js"></script>
 </body>
 

@@ -82,6 +82,7 @@ const customerState = {
   lastCategoryTrigger: null,
   suppressCategoryFocusRestore: false,
   isSubmittingOrder: false,
+  lastPaymentTrigger: null,
 };
 // ── Translation ───────────────────────────────────────────────────────────────
 const SUPPORTED_LANGUAGES = [
@@ -167,6 +168,15 @@ const JS_STATIC_STRINGS = [
   'A cozy sip for cool weather.',
   'A warm classic for chilly weather.',
   'A smooth pick for mild weather.',
+  'How are you paying?',
+  'Credit Card',
+  'Cash',
+  'Please proceed to the cashier to complete your payment.',
+  'Confirm Order',
+  'Order Placed!',
+  'Your drink is on its way.',
+  'Payment',
+  'Total',
 ];
 
 function collectAllTranslatableStrings() {
@@ -3138,15 +3148,39 @@ async function addCustomerSelectionToCart() {
   await refreshCustomerPreview();
 }
 
-async function handleCustomerCheckout() {
-  if (!customerState.cart.length) {
-    setStatus('customer-cart-status', 'Add at least one drink before placing an order.', 'error');
-    return;
+function openCustomerPaymentDialog() {
+  const dialog = document.getElementById('customer-payment-dialog');
+  if (!dialog) return;
+  const totalEl = document.getElementById('customer-payment-dialog-total');
+  if (totalEl) {
+    totalEl.textContent = `${t('Total')}: ${document.getElementById('customer-total')?.textContent || '$0.00'}`;
   }
-  if (customerState.isSubmittingOrder) {
-    setStatus('customer-cart-status', 'Your order is already being submitted.', 'neutral');
-    return;
-  }
+  document.getElementById('customer-payment-step-select')?.removeAttribute('hidden');
+  document.getElementById('customer-payment-step-cash')?.setAttribute('hidden', '');
+  customerState.lastPaymentTrigger = document.activeElement;
+  dialog.showModal();
+  document.getElementById('customer-pay-card')?.focus();
+}
+
+function closeCustomerPaymentDialog() {
+  const dialog = document.getElementById('customer-payment-dialog');
+  if (!dialog) return;
+  dialog.close();
+  const trigger = customerState.lastPaymentTrigger;
+  customerState.lastPaymentTrigger = null;
+  if (trigger && document.contains(trigger)) trigger.focus();
+}
+
+function showCustomerOrderSuccessOverlay() {
+  const overlay = document.getElementById('customer-order-success-overlay');
+  if (!overlay) return;
+  overlay.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n); });
+  overlay.hidden = false;
+  window.setTimeout(() => { overlay.hidden = true; }, 2800);
+}
+
+async function submitCustomerOrderWithPayment(paymentType) {
+  closeCustomerPaymentDialog();
 
   customerState.isSubmittingOrder = true;
   const checkoutButton = document.getElementById('customer-checkout');
@@ -3166,11 +3200,11 @@ async function handleCustomerCheckout() {
         body: JSON.stringify({
           items: customerState.cart.map(toOrderPayload),
           payment: {
-            primaryPaymentType: 'Credit Card',
+            primaryPaymentType: paymentType,
             secondaryPaymentType: null,
             giftAmount: 0,
             discountAmount: customerState.rewardDiscount,
-            cashReceived: 0,
+            cashReceived: paymentType === 'Cash' ? Number(customerState.preview.total || 0) : 0,
             cashChange: 0,
             totalAmount: Number(customerState.preview.total || 0),
           },
@@ -3219,6 +3253,7 @@ async function handleCustomerCheckout() {
       'success'
     );
     showCustomerCheckoutSuccess(checkoutButton);
+    showCustomerOrderSuccessOverlay();
   } catch (error) {
     setStatus('customer-cart-status', error.message || 'Unable to submit your order.', 'error');
     setCustomerCheckoutButtonLabel(checkoutButton, 'Place Order');
@@ -3229,6 +3264,18 @@ async function handleCustomerCheckout() {
       checkoutButton.classList.remove('customer-checkout-submitting');
     }
   }
+}
+
+function handleCustomerCheckout() {
+  if (!customerState.cart.length) {
+    setStatus('customer-cart-status', 'Add at least one drink before placing an order.', 'error');
+    return;
+  }
+  if (customerState.isSubmittingOrder) {
+    setStatus('customer-cart-status', 'Your order is already being submitted.', 'neutral');
+    return;
+  }
+  openCustomerPaymentDialog();
 }
 
 function attachCustomerEventHandlers() {
@@ -3472,6 +3519,26 @@ function attachCustomerEventHandlers() {
     }
   });
   document.getElementById('customer-checkout').addEventListener('click', handleCustomerCheckout);
+
+  // Payment dialog
+  document.getElementById('customer-close-payment-dialog')?.addEventListener('click', closeCustomerPaymentDialog);
+  document.getElementById('customer-pay-card')?.addEventListener('click', () => submitCustomerOrderWithPayment('Credit Card'));
+  document.getElementById('customer-pay-cash')?.addEventListener('click', () => {
+    document.getElementById('customer-payment-step-select')?.setAttribute('hidden', '');
+    document.getElementById('customer-payment-step-cash')?.removeAttribute('hidden');
+    document.getElementById('customer-cash-confirm')?.focus();
+  });
+  document.getElementById('customer-cash-back')?.addEventListener('click', () => {
+    document.getElementById('customer-payment-step-cash')?.setAttribute('hidden', '');
+    document.getElementById('customer-payment-step-select')?.removeAttribute('hidden');
+    document.getElementById('customer-pay-card')?.focus();
+  });
+  document.getElementById('customer-cash-confirm')?.addEventListener('click', () => submitCustomerOrderWithPayment('Cash'));
+  document.getElementById('customer-payment-dialog')?.addEventListener('close', () => {
+    const trigger = customerState.lastPaymentTrigger;
+    customerState.lastPaymentTrigger = null;
+    if (trigger && document.contains(trigger)) trigger.focus();
+  });
   document.getElementById('customer-close-dialog').addEventListener('click', closeCustomerDialog);
   document.getElementById('customer-customize-dialog').addEventListener('close', () => {
     customerState.editingCartIndex = null;
