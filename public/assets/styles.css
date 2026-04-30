@@ -1934,10 +1934,16 @@ body.high-contrast .chat-quick-option {
 
 /* TEA */
 .drink-black-tea { background-image: url('/assets/drinks/tea/black-tea.jpg') !important; }
+.drink-honey-tea { background-image: url('/assets/drinks/tea/honey-tea.jpg') !important; }
+.drink-thai-tea { background-image: url('/assets/drinks/tea/thai-tea.jpg') !important; }
 
 /* COFFEE & SEASONAL */
 .drink-coffee { background-image: url('/assets/drinks/coffee/coffee.jpg') !important; }
 .drink-irish-luck-tea { background-image: url('/assets/drinks/seasonal/irish-luck-tea.jpg') !important; }
+.drink-macchiato { background-image: url('/assets/drinks/coffee/macchiato.jpg') !important; }
+.drink-pumpkin-coffee { background-image: url('/assets/drinks/coffee/pumpkin-coffee.jpg') !important; }
+.drink-peppermint-milk-tea { background-image: url('/assets/drinks/seasonal/peppermint-milk-tea.jpg') !important; }
+.drink-pumpkin-spice-latte { background-image: url('/assets/drinks/seasonal/pumpkin-spice-latte.jpg') !important; }
 
 /* ── Payment Dialog ───────────────────────────────────────────── */
 .customer-payment-options {
