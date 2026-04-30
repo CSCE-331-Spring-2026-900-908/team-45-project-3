@@ -991,24 +991,14 @@ body.high-contrast .customer-tile-slushies {
     radial-gradient(circle at top right, rgba(255, 255, 255, 0.4), transparent 26%),
     linear-gradient(180deg, transparent 0%, rgba(20, 14, 10, 0.12) 34%, rgba(20, 14, 10, 0.78) 100%);
 }
-.customer-tile-boba-tea {
-  background: linear-gradient(145deg, #7a4a2f 0%, #4e2d22 42%, #241715 100%);
-}
-.customer-tile-milk-tea {
-  background: linear-gradient(145deg, #d0a26f 0%, #9b6541 48%, #553124 100%);
-}
-.customer-tile-fruit-tea {
-  background: linear-gradient(145deg, #85b57b 0%, #4f8567 48%, #1d4437 100%);
-}
-.customer-tile-tea {
-  background: linear-gradient(145deg, #446a70 0%, #2c4b50 48%, #183135 100%);
-}
-.customer-tile-coffee {
-  background: linear-gradient(145deg, #8b6250 0%, #55372d 48%, #241815 100%);
-}
-.customer-tile-seasonal {
-  background: linear-gradient(145deg, #f0b953 0%, #d26d3c 50%, #77361f 100%);
-}
+.customer-tile-boba-tea { background-image: url('/assets/categories/boba-tea.jpg') !important; }
+.customer-tile-milk-tea { background-image: url('/assets/categories/milk-tea.jpg') !important; }
+.customer-tile-slushies { background-image: url('/assets/categories/slushies.jpg') !important; }
+.customer-tile-fruit-tea { background-image: url('/assets/categories/fruit-tea.jpg') !important; }
+.customer-tile-tea { background-image: url('/assets/categories/tea.jpg') !important; }
+.customer-tile-coffee { background-image: url('/assets/categories/coffee.jpg') !important; }
+.customer-tile-seasonal { background-image: url('/assets/categories/seasonal.jpg') !important; } 
+
 .customer-product-overlay {
   position: absolute;
   /* top: auto, right: auto, bottom: 18px, left: 18px */
@@ -1837,7 +1827,6 @@ body.high-contrast .chat-quick-option {
 
 /* TEA */
 .drink-black-tea { background-image: url('/assets/drinks/tea/black-tea.jpg') !important; }
-.drink-lettuce-tea { background-image: url('/assets/drinks/tea/lettuce-tea.jpg') !important; }
 
 /* COFFEE & SEASONAL */
 .drink-coffee { background-image: url('/assets/drinks/coffee/coffee.jpg') !important; }
