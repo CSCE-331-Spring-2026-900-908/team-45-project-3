@@ -177,6 +177,9 @@ const JS_STATIC_STRINGS = [
   'Your drink is on its way.',
   'Payment',
   'Total',
+  'Default',
+  'Extra Large',
+  'Maximum',
 ];
 
 function collectAllTranslatableStrings() {
