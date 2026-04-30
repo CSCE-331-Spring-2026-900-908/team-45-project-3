@@ -5,6 +5,101 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>12th Man Tea — Portal</title>
     <link rel="stylesheet" href="/assets/styles.css" />
+    <style>
+      /* Weather Widget Styles */
+      #forecast-container {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+        margin-top: 1rem;
+      }
+
+      /* Featured (Today's) Weather - Compact & Centered */
+      .forecast-featured {
+        display: flex;
+        flex-direction: column; /* Stack image and text vertically */
+        align-items: center;    /* Center them horizontally */
+        text-align: center;     /* Center the text inside */
+        background: #f8fafc;
+        border: 2px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 2rem;
+        gap: 1rem;
+        max-width: 400px;       /* Keeps it from spanning the whole width */
+        margin: 0 auto;         /* Centers the card itself in the container */
+      }
+      .forecast-featured img {
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      }
+      .forecast-featured-info {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+      }
+      .forecast-featured-info h3 {
+        margin: 0;
+        font-size: 1.5rem;
+        color: #0f172a;
+      }
+      .forecast-featured-info .temp {
+        font-size: 3rem;
+        font-weight: 800;
+        margin: 0;
+        line-height: 1;
+      }
+      .forecast-featured-info .desc {
+        font-size: 1.125rem;
+        color: #475569;
+        margin: 0.5rem 0 0 0;
+      }
+
+      /* Upcoming Weather Grid */
+      .forecast-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+        gap: 1rem;
+      }
+      .forecast-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 1rem;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .forecast-card h3 {
+        margin: 0;
+        font-size: 0.9rem;
+        color: #334155;
+      }
+      .forecast-card img {
+        border-radius: 50%;
+        width: 64px;
+        height: 64px;
+      }
+      .forecast-card .temp {
+        font-size: 1.25rem;
+        font-weight: bold;
+        margin: 0;
+      }
+      .forecast-card .desc {
+        font-size: 0.8rem;
+        color: #64748b;
+        margin: 0;
+      }
+
+      /* Temperature Color Classes */
+      .hot { color: #dc2626; }
+      .warm { color: #ea580c; }
+      .cool { color: #2563eb; }
+      .cold { color: #1d4ed8; }
+    </style>
   </head>
   <body data-page="portal">
     <div class="page-shell">
@@ -57,39 +152,64 @@
       const lat = 30.6280;
       const lon = -96.3344; //BCS location
 
+      // Helper function to assign temperature colors
+      function getTempClass(temp) {
+        if (temp >= 85) return 'hot';
+        if (temp >= 70) return 'warm';
+        if (temp <= 45) return 'cold';
+        return 'cool';
+      }
+
       async function fetchNWSForecast() {
         const container = document.getElementById('forecast-container');
         try {
-          const pointsRes = await fetch(`https://api.weather.gov/points/${lat},${lon}`); //error handling
+          const pointsRes = await fetch(`https://api.weather.gov/points/${lat},${lon}`);
           if (!pointsRes.ok) throw new Error('Could not reach the weather service.');
+          
           const pointsData = await pointsRes.json();
           const forecastRes = await fetch(pointsData.properties.forecast);
           if (!forecastRes.ok) throw new Error('Could not load forecast data.');
-          const forecastData = await forecastRes.json(); //jsonify
+          
+          const forecastData = await forecastRes.json();
           const periods = forecastData.properties.periods.slice(0, 7);
+          
           container.innerHTML = '';
+
+          // 1. Render Featured Forecast (Today)
+          const today = periods[0];
+          const featuredCard = document.createElement('div');
+          featuredCard.className = 'forecast-featured';
+          featuredCard.innerHTML = `
+            <img src="${today.icon}" alt="${today.shortForecast}" />
+            <div class="forecast-featured-info">
+              <h3>${today.name}</h3>
+              <p class="temp ${getTempClass(today.temperature)}">${today.temperature}&deg;${today.temperatureUnit}</p>
+              <p class="desc">${today.shortForecast}</p>
+            </div>
+          `;
+          container.appendChild(featuredCard);
+
+          // 2. Render Grid for Upcoming Forecasts
           const grid = document.createElement('div');
           grid.className = 'forecast-grid';
-          periods.forEach((period) => {
-            let tempClass = 'cool';
-            if (period.temperature >= 85) tempClass = 'hot';
-            else if (period.temperature >= 70) tempClass = 'warm';
-            else if (period.temperature <= 45) tempClass = 'cold';
+          
+          // Loop through the remaining periods starting from index 1
+          periods.slice(1).forEach((period) => {
             const card = document.createElement('div');
             card.className = 'forecast-card';
             card.innerHTML = `
               <h3>${period.name}</h3>
-              <img src="${period.icon}" alt="${period.shortForecast}" width="86" height="86" />
-              <p class="temp ${tempClass}">${period.temperature}&deg;${period.temperatureUnit}</p>
+              <img src="${period.icon}" alt="${period.shortForecast}" />
+              <p class="temp ${getTempClass(period.temperature)}">${period.temperature}&deg;${period.temperatureUnit}</p>
               <p class="desc">${period.shortForecast}</p>
             `;
-            grid.appendChild(card); //adds all the cards to a grid
+            grid.appendChild(card);
           });
 
-          container.appendChild(grid); //actually appends grid to the container
+          container.appendChild(grid);
         } catch (error) {
           container.innerHTML = `<p class="status-text" data-tone="error">Unable to load weather: ${error.message}</p>`;
-        } //proper error handling
+        }
       }
 
       fetchNWSForecast();
