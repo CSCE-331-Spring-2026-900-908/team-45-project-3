@@ -495,15 +495,15 @@ function resetCustomizationForm() {
   const defaults = defaultCustomization();
   document.getElementById('staff-qty').value = defaults.quantity;
   document.querySelector(`input[name="staff-size"][value="${defaults.size}"]`).checked = true;
-  
+
   document.getElementById('staff-sugar').value = defaults.sugarPercent;
   setText('staff-sugar-value', `${defaults.sugarPercent}%`);
-  
+
   const defaultIceField = document.querySelector(`input[name="staff-ice"][value="${defaults.icePercent}"]`);
   if (defaultIceField) {
     defaultIceField.checked = true;
   }
-  
+
   renderStaffToppingOptions();
   renderStaffCustomizationPrice();
 }
@@ -691,10 +691,10 @@ function setCustomerProducts(products, preserveActiveCategory = false) {
 function customizationMatches(a, b) {
   const toppingsA = [...(a.toppings || [])].sort();
   const toppingsB = [...(b.toppings || [])].sort();
-  return a.size === b.size && 
-         a.sugarPercent === b.sugarPercent && 
-         a.icePercent === b.icePercent && 
-         JSON.stringify(toppingsA) === JSON.stringify(toppingsB);
+  return a.size === b.size &&
+    a.sugarPercent === b.sugarPercent &&
+    a.icePercent === b.icePercent &&
+    JSON.stringify(toppingsA) === JSON.stringify(toppingsB);
 }
 
 function customizationSummary(item) {
@@ -2273,7 +2273,7 @@ function normalizeCustomerCategory(product) {
     return categoryKey;
   }
   const source = `${product.name || ''}`.toLowerCase();
-  
+
   if (source.includes('season') || source.includes('limited') || source.includes('holiday') || source.includes('special')) {
     return 'seasonal';
   }
@@ -2388,14 +2388,14 @@ function renderCustomerCartRewardStatus() {
 function readCustomerCustomizationForm() {
   const sizeField = document.querySelector('input[name="customer-size"]:checked');
   // Add the ice field reader
-  const iceField = document.querySelector('input[name="customer-ice"]:checked'); 
+  const iceField = document.querySelector('input[name="customer-ice"]:checked');
 
   return {
     quantity: Math.max(1, Number(document.getElementById('customer-qty').value) || 1),
     size: sizeField ? sizeField.value : 'Medium',
     sugarPercent: readPercentInput('customer-sugar', 50),
     // Safely read the ice value, default to 50
-    icePercent: iceField ? Number(iceField.value) : 50, 
+    icePercent: iceField ? Number(iceField.value) : 50,
     toppings: Array.from(document.querySelectorAll('input[name="customer-topping"]:checked')).map((element) => element.value),
   };
 }
@@ -2405,10 +2405,10 @@ function resetCustomerCustomizationForm() {
   document.querySelector('input[name="customer-size"][value="Medium"]').checked = true;
   document.getElementById('customer-sugar').value = '50';
   setText('customer-sugar-value', '50%');
-  
+
   // Add this line to reset the ice back to 50% when the dialog closes
-  document.querySelector('input[name="customer-ice"][value="50"]').checked = true; 
-  
+  document.querySelector('input[name="customer-ice"][value="50"]').checked = true;
+
   renderCustomerToppingOptions();
 }
 
@@ -2817,7 +2817,12 @@ function renderCustomerProducts() {
     const tile = document.createElement('button');
     const isDisabled = Boolean(item.outOfStock);
     tile.type = 'button';
-    tile.className = `customer-product-tile customer-tile-${normalizeCustomerCategory(item)}${isDisabled ? ' customer-product-tile-disabled' : ''}`;
+
+    // This creates a safe CSS class name (e.g. "Mango Slushy" -> "mango-slushy")
+    const drinkSlug = String(item.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+    // Add the new drink slug to the class list
+    tile.className = `customer-product-tile customer-tile-${normalizeCustomerCategory(item)} drink-${drinkSlug}${isDisabled ? ' customer-product-tile-disabled' : ''}`;
     tile.disabled = isDisabled;
     tile.innerHTML = `
       <span class="customer-product-overlay">

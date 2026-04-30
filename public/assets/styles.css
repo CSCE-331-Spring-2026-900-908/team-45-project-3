@@ -987,6 +987,10 @@ body.high-contrast .customer-tile-slushies {
   color: white;
   text-align: left;
   box-shadow: var(--shadow);
+
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
 }
 .customer-product-tile-disabled {
   cursor: not-allowed;
@@ -1027,19 +1031,21 @@ body.high-contrast .customer-tile-slushies {
 }
 .customer-product-overlay {
   position: absolute;
-  inset: 12px;
+  /* top: auto, right: auto, bottom: 18px, left: 18px */
+  /* This strictly pins the box to the bottom left corner */
+  inset: auto auto 18px 18px; 
   z-index: 2;
-  display: grid;
-  grid-template-rows: auto 1fr auto auto;
-  align-content: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start; /* Forces all text to align perfectly to the left */
+  text-align: left;
   gap: 4px;
-  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  /* Slightly darker shadow to ensure white text pops against bright photos */
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.7); 
 }
+
 .customer-product-overlay .section-label {
-  margin-bottom: 0;
-  color: rgba(255, 248, 232, 0.95);
-  align-self: start;
-  justify-self: start;
+  display: none !important; /* Hides the redundant category text */
 }
 .customer-product-overlay span:last-child {
   color: rgba(255, 255, 255, 0.96);
@@ -1818,3 +1824,30 @@ body.high-contrast .chat-quick-option {
   padding: 4px;
   border-radius: 8px;
 }
+
+.drink-matcha-tea-with-golden-pearls { background-image: url('/assets/matcha-tea-with-golden-pearls.jpg') !important; }
+.drink-honey-tea-with-classic-tapioca { background-image: url('/assets/honey-tea-with-classic-tapioca.jpg') !important; }
+.drink-almond-tea-with-crystal-boba { background-image: url('/assets/almond-tea-with-crystal-boba.jpg') !important; }
+.drink-chocolate-tea-with-classic-tapioca { background-image: url('/assets/chocolate-tea-with-classic-tapioca.jpg') !important; }
+.drink-brown-sugar-tea-with-golden-pearls { background-image: url('/assets/brown-sugar-tea-with-golden-pearls.jpg') !important; }
+.drink-bananza { background-image: url('/assets/bananza.jpg') !important; }
+.drink-lettuce-tea { background-image: url('/assets/lettuce-tea.jpg') !important; }
+.drink-coffee { background-image: url('/assets/coffee.jpg') !important; }
+.drink-watermelon-fruit-tea { background-image: url('/assets/watermelon-fruit-tea.jpg') !important; }
+.drink-peach-fruit-tea { background-image: url('/assets/peach-fruit-tea.jpg') !important; }
+.drink-blueberry-fruit-tea { background-image: url('/assets/blueberry-fruit-tea.jpg') !important; }
+.drink-mango-fruit-tea { background-image: url('/assets/mango-fruit-tea.jpg') !important; }
+.drink-kiwi-fruit-tea { background-image: url('/assets/kiwi-fruit-tea.jpg') !important; }
+.drink-dragonfruit-fruit-tea { background-image: url('/assets/dragonfruit-fruit-tea.jpg') !important; }
+.drink-irish-luck-tea { background-image: url('/assets/irish-luck-tea.jpg') !important; }
+.drink-almond-milk-tea { background-image: url('/assets/almond-milk-tea.jpg') !important; }
+.drink-taro-milk-tea { background-image: url('/assets/taro-milk-tea.jpg') !important; }
+.drink-vanilla-milk-tea { background-image: url('/assets/vanilla-milk-tea.jpg') !important; }
+.drink-honey-milk-tea { background-image: url('/assets/honey-milk-tea.jpg') !important; }
+.drink-brown-sugar-milk-tea { background-image: url('/assets/brown-sugar-milk-tea.jpg') !important; }
+.drink-spring-milk-tea { background-image: url('/assets/spring-milk-tea.jpg') !important; }
+.drink-milk-tea { background-image: url('/assets/milk-tea.jpg') !important; }
+.drink-peach-slushy { background-image: url('/assets/peach-slushy.jpg') !important; }
+.drink-strawberry-slushy { background-image: url('/assets/strawberry-slushy.jpg') !important; }
+.drink-mango-slushy { background-image: url('/assets/mango-slushy.jpg') !important; }
+.drink-black-tea { background-image: url('/assets/black-tea.jpg') !important; }
