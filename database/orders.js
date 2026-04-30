@@ -301,7 +301,7 @@ async function findIngredientShortages(client, requiredIngredients) {
   const shortages = [];
   for (const [ingredientId, requiredQuantity] of requiredIngredients.entries()) {
     const ingredientName = ingredientNames.get(ingredientId) || `Ingredient ${ingredientId}`;
-    if (isUnlimitedIngredient(ingredientName) || isPackagingIngredient(ingredientName)) {
+    if (isUnlimitedIngredient(ingredientName)) {
       continue;
     }
     const { rows } = await client.query('SELECT quantity FROM inventory WHERE id = $1', [ingredientId]);
@@ -317,7 +317,7 @@ async function decrementInventory(client, requiredIngredients) {
   const ingredientNames = await fetchIngredientNames(client);
   for (const [ingredientId, amount] of requiredIngredients.entries()) {
     const ingredientName = ingredientNames.get(ingredientId) || '';
-    if (isUnlimitedIngredient(ingredientName) || isPackagingIngredient(ingredientName)) {
+    if (isUnlimitedIngredient(ingredientName)) {
       continue;
     }
     await client.query('UPDATE inventory SET quantity = quantity - $1 WHERE id = $2', [amount, ingredientId]);
