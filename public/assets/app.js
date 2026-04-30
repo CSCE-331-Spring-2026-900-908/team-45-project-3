@@ -29,7 +29,7 @@ const TOPPING_PRICE_DELTA = 0.25;
 const CUSTOMER_FALLBACK_TOPPINGS = DEFAULT_TOPPINGS;
 const CUSTOMER_PHONE_DIGIT_PATTERN = /\d/g;
 const CUSTOMER_PHONE_NUMBER_LENGTH = 10;
-const CUSTOMER_CATEGORY_ORDER = ['boba-tea', 'milk-tea', 'slushy', 'fruit-tea', 'tea', 'coffee', 'seasonal'];
+const CUSTOMER_CATEGORY_ORDER = ['boba-tea', 'milk-tea', 'slushies', 'fruit-tea', 'tea', 'coffee', 'seasonal'];
 
 const CUSTOMER_CATEGORY_META = {
   'boba-tea': {
@@ -41,7 +41,7 @@ const CUSTOMER_CATEGORY_META = {
     description: 'Creamy classics and rich house favorites.',
   },
   // Add this new block!
-  'slushy': {
+  'slushies': {
     label: 'Slushies',
     description: 'Ice-blended drinks perfect for beating the heat.',
   },
@@ -2267,14 +2267,18 @@ function setCustomerAccessibilityPanelOpen(isOpen) {
 }
 
 function normalizeCustomerCategory(product) {
-  const source = `${product.category || ''} ${product.name || ''}`.toLowerCase();
+  const categoryKey = getMenuCategoryKey(product.category);
+  if (CUSTOMER_CATEGORY_ORDER.includes(categoryKey)) {
+    return categoryKey;
+  }
+  const source = `${product.name || ''}`.toLowerCase();
   
   if (source.includes('season') || source.includes('limited') || source.includes('holiday') || source.includes('special')) {
     return 'seasonal';
   }
-  // Add this block to catch your new Slushy category
+  // Catch slush-style product names when no canonical category is available.
   if (source.includes('slush')) {
-    return 'slushy';
+    return 'slushies';
   }
   if (source.includes('milk')) {
     return 'milk-tea';
