@@ -896,6 +896,10 @@ h1 { font-size: clamp(2.4rem, 6vw, 4.6rem); line-height: 0.96; max-width: 12ch; 
   gap: 8px;
   box-shadow: var(--shadow);
   transition: transform 180ms ease, box-shadow 180ms ease, outline-color 180ms ease;
+  
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
 }
 .customer-category-button:hover {
   transform: translateY(-3px);
@@ -915,23 +919,37 @@ h1 { font-size: clamp(2.4rem, 6vw, 4.6rem); line-height: 0.96; max-width: 12ch; 
   transform: translateY(-2px);
   box-shadow: 0 0 0 3px rgba(255, 250, 242, 0.55), var(--shadow);
 }
+/* --- Category Background Images --- */
+
+/* Note: The linear-gradient acts as a dark "shadow tint" at the bottom 
+   so your white text stays readable no matter how bright the photo is! */
+
 .customer-category-boba-tea {
-  background: linear-gradient(160deg, #5b392d, #b55d3d 60%, #e3b17f);
+  background-image: linear-gradient(to top, rgba(20, 14, 10, 0.95) 0%, rgba(20, 14, 10, 0.1) 70%), url('/assets/boba-tea.jpg');
 }
+
 .customer-category-milk-tea {
-  background: linear-gradient(160deg, #6f4b3d, #b9814d 58%, #f0d0ab);
+  background-image: linear-gradient(to top, rgba(20, 14, 10, 0.95) 0%, rgba(20, 14, 10, 0.1) 70%), url('/assets/milk-tea.jpg');
 }
+
+.customer-category-slushies {
+  background-image: linear-gradient(to top, rgba(20, 14, 10, 0.95) 0%, rgba(20, 14, 10, 0.1) 70%), url('/assets/slushies.jpg');
+}
+
 .customer-category-fruit-tea {
-  background: linear-gradient(160deg, #3f6d59, #68a87d 52%, #d2ebcf);
+  background-image: linear-gradient(to top, rgba(20, 14, 10, 0.95) 0%, rgba(20, 14, 10, 0.1) 70%), url('/assets/fruit-tea.jpg');
 }
+
 .customer-category-tea {
-  background: linear-gradient(160deg, #31515c, #587f75 52%, #b8d8c7);
+  background-image: linear-gradient(to top, rgba(20, 14, 10, 0.95) 0%, rgba(20, 14, 10, 0.1) 70%), url('/assets/tea.jpg');
 }
+
 .customer-category-coffee {
-  background: linear-gradient(160deg, #3b2a24, #7a5142 55%, #d3aa82);
+  background-image: linear-gradient(to top, rgba(20, 14, 10, 0.95) 0%, rgba(20, 14, 10, 0.1) 70%), url('/assets/coffee.jpg');
 }
+
 .customer-category-seasonal {
-  background: linear-gradient(160deg, #7b4e2e, #c97d42 50%, #f3c76b);
+  background-image: linear-gradient(to top, rgba(20, 14, 10, 0.95) 0%, rgba(20, 14, 10, 0.1) 70%), url('/assets/seasonal.jpg');
 }
 .customer-category-label {
   font-size: 1.35rem;
@@ -943,9 +961,7 @@ h1 { font-size: clamp(2.4rem, 6vw, 4.6rem); line-height: 0.96; max-width: 12ch; 
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 /* Add to standard colors */
-.customer-category-slushies {
-  background: linear-gradient(160deg, #4b7b8c, #6eb5c0 60%, #b8e1e6);
-}
+
 .customer-tile-slushies {
   background: linear-gradient(145deg, #5b9db0 0%, #3a7587 48%, #1f4a57 100%);
 }
