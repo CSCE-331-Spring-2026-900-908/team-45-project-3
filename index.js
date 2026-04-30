@@ -234,6 +234,35 @@ function createApp() {
     res.json({ ...portalContent, ...(await db.fetchPortalSummary()) });
   }));
 
+  app.get('/api/weather/current', asyncHandler(async (_, res) => {
+    const latitude = process.env.WEATHER_LATITUDE || '30.6280';
+    const longitude = process.env.WEATHER_LONGITUDE || '-96.3344';
+    const weatherUrl = new URL('https://api.open-meteo.com/v1/forecast');
+    weatherUrl.search = new URLSearchParams({
+      latitude,
+      longitude,
+      current: 'temperature_2m,weather_code',
+      temperature_unit: 'fahrenheit',
+      timezone: process.env.WEATHER_TIMEZONE || 'America/Chicago',
+    }).toString();
+
+    const response = await fetch(weatherUrl);
+    if (!response.ok) {
+      const error = new Error('Unable to load current weather.');
+      error.statusCode = 502;
+      throw error;
+    }
+
+    const data = await response.json();
+    res.json({
+      source: 'open-meteo',
+      location: process.env.WEATHER_LOCATION || 'College Station',
+      temperatureF: Number(data.current?.temperature_2m),
+      weatherCode: Number(data.current?.weather_code),
+      observedAt: data.current?.time || null,
+    });
+  }));
+
   // --- Read-only API routes ---
   app.get('/api/products', asyncHandler(async (req, res) => {
     const includeAvailability = req.query.availability !== 'false';

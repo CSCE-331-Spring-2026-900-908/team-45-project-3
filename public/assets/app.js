@@ -71,6 +71,7 @@ const customerState = {
   rewardDiscount: 0,
   rewardCreditApplied: false,
   profile: null,
+  weather: null,
   selectedProductId: null,
   editingCartIndex: null,
   highContrast: false,
@@ -107,7 +108,7 @@ const JS_STATIC_STRINGS = [
   'Member ID:',
   'No rewards profile yet',
   'Ask about the menu\u2026',
-  'Hi! I\'m your Reveille Bubble Tea assistant. Ask me anything about the menu, customizations, or our rewards program!',
+  'Howdy! I\'m your 12th Man. Ask me anything about the menu, customizations, or our rewards program!',
   'Sign in or create an account to count orders toward a free drink.',
   '0 of 5 orders completed',
   'of 5 orders completed toward next reward',
@@ -156,6 +157,16 @@ const JS_STATIC_STRINGS = [
   'Free drink credit removed.',
   'credit',
   'credits',
+  'Weather Pick',
+  'Today\'s Pick',
+  'Current Weather',
+  'Open customization options.',
+  'A seasonal favorite for today.',
+  'A bright cooler for warm weather.',
+  'A frozen drink for hot weather.',
+  'A cozy sip for cool weather.',
+  'A warm classic for chilly weather.',
+  'A smooth pick for mild weather.',
 ];
 
 function collectAllTranslatableStrings() {
@@ -686,6 +697,98 @@ function setCustomerProducts(products, preserveActiveCategory = false) {
   }
   renderCustomerCategoryButtons();
   renderCustomerProducts();
+  renderCustomerWeatherFeature();
+}
+
+function getWeatherDescription(weatherCode) {
+  const code = Number(weatherCode);
+  if (code === 0) return 'clear';
+  if ([1, 2, 3].includes(code)) return 'cloudy';
+  if ([45, 48].includes(code)) return 'foggy';
+  if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) return 'rainy';
+  if (code >= 71 && code <= 77) return 'snowy';
+  if (code >= 95) return 'stormy';
+  return 'mild';
+}
+
+function getCustomerWeatherPick() {
+  const temperature = Number(customerState.weather?.temperatureF);
+  const code = Number(customerState.weather?.weatherCode);
+  const condition = getWeatherDescription(code);
+
+  if (condition === 'rainy' || condition === 'stormy') {
+    return { categoryKey: 'milk-tea', reason: 'A cozy sip for cool weather.' };
+  }
+  if (Number.isFinite(temperature) && temperature >= 88) {
+    return { categoryKey: 'slushies', reason: 'A frozen drink for hot weather.' };
+  }
+  if (Number.isFinite(temperature) && temperature >= 76) {
+    return { categoryKey: 'fruit-tea', reason: 'A bright cooler for warm weather.' };
+  }
+  if (Number.isFinite(temperature) && temperature <= 50) {
+    return { categoryKey: 'coffee', reason: 'A warm classic for chilly weather.' };
+  }
+  if (Number.isFinite(temperature) && temperature <= 64) {
+    return { categoryKey: 'tea', reason: 'A cozy sip for cool weather.' };
+  }
+  return { categoryKey: 'seasonal', reason: 'A smooth pick for mild weather.' };
+}
+
+function getFeaturedProductForWeather() {
+  const pick = getCustomerWeatherPick();
+  const productsInCategory = customerState.products.filter((item) =>
+    normalizeCustomerCategory(item) === pick.categoryKey && !item.outOfStock
+  );
+  const product = productsInCategory[0] || getFirstAvailableProduct(customerState.products);
+  return product ? { product, pick } : null;
+}
+
+function renderCustomerWeatherFeature() {
+  const container = document.getElementById('customer-weather-feature');
+  if (!container) {
+    return;
+  }
+
+  const feature = getFeaturedProductForWeather();
+  if (!feature) {
+    container.hidden = true;
+    container.innerHTML = '';
+    return;
+  }
+
+  const { product, pick } = feature;
+  const weather = customerState.weather;
+  const hasTemperature = Number.isFinite(Number(weather?.temperatureF));
+  const temperatureLabel = hasTemperature ? `${Math.round(Number(weather.temperatureF))}°F` : t('Today\'s Pick');
+  const condition = weather ? getWeatherDescription(weather.weatherCode) : 'today';
+  const drinkSlug = String(product.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+  container.hidden = false;
+  container.innerHTML = `
+    <button class="customer-featured-button customer-tile-${normalizeCustomerCategory(product)} drink-${drinkSlug}" type="button">
+      <span class="customer-featured-copy">
+        <span class="section-label">${escapeHtml(t('Weather Pick'))}</span>
+        <strong>${escapeHtml(t(product.name))}</strong>
+        <span>${escapeHtml(temperatureLabel)}${weather ? ` ${escapeHtml(condition)}` : ''} · ${escapeHtml(t(pick.reason))}</span>
+      </span>
+      <span class="customer-featured-price">${formatCurrency(product.price)}</span>
+    </button>
+  `;
+
+  const button = container.querySelector('.customer-featured-button');
+  button?.setAttribute('aria-label', `${t('Weather Pick')}: ${t(product.name)}, ${formatCurrency(product.price)}. ${t('Open customization options.')}`);
+  button?.addEventListener('click', () => openCustomerDialog(product.id));
+}
+
+async function loadCustomerWeatherFeature() {
+  try {
+    const weather = await fetchJson('/api/weather/current');
+    customerState.weather = weather;
+  } catch (error) {
+    console.warn('Unable to load weather feature:', error);
+    customerState.weather = null;
+  }
+  renderCustomerWeatherFeature();
 }
 
 function customizationMatches(a, b) {
@@ -1756,6 +1859,14 @@ async function runReportMostOrdered() {
 
 async function runReportX() {
   const data = await fetchJson('/api/reports/x');
+  const activeRows = (data.today || []).filter((item) =>
+    Number(item.sales) !== 0 ||
+    Number(item.voids) !== 0 ||
+    Number(item.creditCard) !== 0 ||
+    Number(item.debitCard) !== 0 ||
+    Number(item.giftCard) !== 0 ||
+    Number(item.cash) !== 0
+  );
   renderTable('manager-report-table', [
     { key: 'hourLabel', label: 'Hour' },
     { key: 'salesLabel', label: 'Sales' },
@@ -1764,7 +1875,7 @@ async function runReportX() {
     { key: 'debitLabel', label: 'Debit Card' },
     { key: 'giftLabel', label: 'Gift Card' },
     { key: 'cashLabel', label: 'Cash' },
-  ], (data.today || []).map((item) => ({
+  ], activeRows.map((item) => ({
     hourLabel: `${String(item.hour).padStart(2, '0')}:00`,
     salesLabel: formatCurrency(item.sales),
     voidsLabel: formatCurrency(item.voids),
@@ -1773,7 +1884,11 @@ async function runReportX() {
     giftLabel: formatCurrency(item.giftCard),
     cashLabel: formatCurrency(item.cash),
   })));
-  setStatus('manager-reports-status', 'Loaded X-report (today).', 'success');
+  setStatus(
+    'manager-reports-status',
+    activeRows.length ? 'Loaded X-report activity since the last Z-report/reset.' : 'No X-report activity since the last Z-report/reset.',
+    'success'
+  );
 }
 
 async function runReportInventoryUsage(form) {
@@ -3426,6 +3541,7 @@ async function bootCustomer() {
   attachCustomerEventHandlers();
   attachChatEventHandlers();
   loadCustomerToppingsFromInventory();
+  loadCustomerWeatherFeature();
 
   const rewardsSessionPromise = loadCustomerRewardsSession()
     .then(() => {
@@ -3598,7 +3714,7 @@ function openChatWidget() {
   // Show a greeting on first open
   const container = document.getElementById('chat-messages');
   if (container && !container.children.length) {
-    appendChatBubble('assistant', t('Hi! I\'m your Reveille Bubble Tea assistant. Ask me anything about the menu, customizations, or our rewards program!'));
+    appendChatBubble('assistant', t('Howdy! I\'m your 12th Man. Ask me anything about the menu, customizations, or our rewards program!'));
   }
 
   document.getElementById('chat-input')?.focus();

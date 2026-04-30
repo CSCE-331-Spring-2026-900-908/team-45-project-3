@@ -20,9 +20,30 @@ body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   color: var(--ink);
   background:
+    radial-gradient(circle at 30px 30px, rgba(255, 255, 255, 0.62) 0 3px, transparent 4px),
+    radial-gradient(circle at 30px 30px, rgba(91, 57, 45, 0.26) 0 14px, transparent 15px),
+    radial-gradient(circle at 120px 30px, rgba(255, 255, 255, 0.56) 0 3px, transparent 4px),
+    radial-gradient(circle at 120px 30px, rgba(181, 93, 61, 0.22) 0 13px, transparent 14px),
+    radial-gradient(circle at 75px 95px, rgba(255, 255, 255, 0.58) 0 3px, transparent 4px),
+    radial-gradient(circle at 75px 95px, rgba(217, 147, 93, 0.23) 0 15px, transparent 16px),
+    radial-gradient(circle at 150px 125px, rgba(255, 255, 255, 0.54) 0 3px, transparent 4px),
+    radial-gradient(circle at 150px 125px, rgba(101, 79, 136, 0.18) 0 12px, transparent 13px),
     radial-gradient(circle at top left, rgba(255, 210, 174, 0.8), transparent 26%),
     radial-gradient(circle at bottom right, rgba(181, 93, 61, 0.25), transparent 28%),
     linear-gradient(135deg, #f7f1e8 0%, #f3e4d3 54%, #efe2d5 100%);
+  background-size:
+    180px 160px,
+    180px 160px,
+    180px 160px,
+    180px 160px,
+    180px 160px,
+    180px 160px,
+    180px 160px,
+    180px 160px,
+    auto,
+    auto,
+    auto;
+  background-attachment: fixed;
 }
 
 a { color: inherit; text-decoration: none; }
@@ -940,6 +961,76 @@ h1 { font-size: clamp(2.4rem, 6vw, 4.6rem); line-height: 0.96; max-width: 12ch; 
   color: rgba(255, 255, 255, 0.96);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
+.customer-weather-feature {
+  margin-top: 18px;
+}
+.customer-featured-button {
+  position: relative;
+  width: 100%;
+  min-height: 132px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 18px;
+  padding: 18px;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  text-align: left;
+  box-shadow: var(--shadow);
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+}
+.customer-featured-button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.42), transparent 28%),
+    linear-gradient(90deg, rgba(20, 14, 10, 0.84) 0%, rgba(20, 14, 10, 0.46) 58%, rgba(20, 14, 10, 0.18) 100%);
+}
+.customer-featured-button:hover {
+  transform: translateY(-2px);
+}
+.customer-featured-button:focus-visible {
+  outline: 5px solid #111111;
+  outline-offset: 5px;
+  box-shadow: 0 0 0 9px #ffd84d;
+}
+.customer-featured-copy,
+.customer-featured-price {
+  position: relative;
+  z-index: 1;
+}
+.customer-featured-copy {
+  display: grid;
+  gap: 6px;
+  max-width: 68ch;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.72);
+}
+.customer-featured-copy .section-label {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.9);
+}
+.customer-featured-copy strong {
+  font-size: 1.4rem;
+  line-height: 1.1;
+}
+.customer-featured-copy span:last-child {
+  color: rgba(255, 255, 255, 0.94);
+  line-height: 1.4;
+}
+.customer-featured-price {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  background: rgba(20, 14, 10, 0.42);
+  font-weight: 800;
+}
 /* Add to standard colors */
 
 .customer-tile-slushies {
@@ -1293,6 +1384,7 @@ body.high-contrast .customer-numpad-back {
 
 /* Product Buttons / Tiles in High Contrast */
 body.high-contrast .customer-category-button,
+body.high-contrast .customer-featured-button,
 body.high-contrast .customer-product-tile {
   background: #000000 !important;
   color: #ffffff !important;
@@ -1300,10 +1392,12 @@ body.high-contrast .customer-product-tile {
   box-shadow: none !important;
 }
 body.high-contrast .customer-product-tile::before,
+body.high-contrast .customer-featured-button::before,
 body.high-contrast .customer-product-tile::after {
   display: none !important; /* Remove gradient overlays */
 }
 body.high-contrast .customer-category-button:hover,
+body.high-contrast .customer-featured-button:hover,
 body.high-contrast .customer-product-tile:hover {
   border-color: #ffd400 !important;
   transform: translateY(-2px);
@@ -1392,6 +1486,11 @@ body.high-contrast .customer-dialog::backdrop {
   .customer-category-grid,
   .customer-product-grid {
     grid-template-columns: 1fr;
+  }
+  .customer-featured-button {
+    align-items: flex-start;
+    flex-direction: column;
+    justify-content: flex-end;
   }
   .customer-cart-rewards-top {
     grid-template-columns: 1fr;
