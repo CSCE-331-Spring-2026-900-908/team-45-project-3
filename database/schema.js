@@ -1,6 +1,8 @@
 const { getPool } = require('./client');
 
 let hasVerifiedProductActiveColumn = false;
+let hasVerifiedProductCategoriesTable = false;
+let hasVerifiedInventoryToppingsCategory = false;
 
 async function ensureProductActiveColumn(client = null) {
   if (hasVerifiedProductActiveColumn) {
@@ -98,6 +100,51 @@ async function ensureRewardsAccountsTable(client = null) {
   }
 }
 
+async function ensureProductCategoriesTable(client = null) {
+  if (hasVerifiedProductCategoriesTable) {
+    return;
+  }
+
+  const runner = client || getPool();
+  await runner.query(
+    'CREATE TABLE IF NOT EXISTS product_categories (' +
+      'name TEXT PRIMARY KEY, ' +
+      'created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP' +
+    ')'
+  );
+
+  const categories = ['Boba Tea', 'Milk Tea', 'Slushies', 'Fruit Tea', 'Tea', 'Coffee', 'Seasonal'];
+  for (const category of categories) {
+    await runner.query('INSERT INTO product_categories (name) VALUES ($1) ON CONFLICT (name) DO NOTHING', [category]);
+  }
+
+  hasVerifiedProductCategoriesTable = true;
+}
+
+async function ensureInventoryToppingsCategory(client = null) {
+  if (hasVerifiedInventoryToppingsCategory) {
+    return;
+  }
+
+  const runner = client || getPool();
+  const toppings = ['Boba', 'Crystal Boba', 'Lychee Jelly', 'Pudding'];
+  for (const topping of toppings) {
+    const existing = await runner.query('SELECT id FROM inventory WHERE lower(name) = lower($1) LIMIT 1', [topping]);
+    if (existing.rows.length) {
+      await runner.query('UPDATE inventory SET category = $1 WHERE id = $2', ['Toppings', existing.rows[0].id]);
+      continue;
+    }
+
+    const nextId = await runner.query('SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM inventory');
+    await runner.query(
+      'INSERT INTO inventory (id, name, category, price, quantity) VALUES ($1, $2, $3, $4, $5)',
+      [Number(nextId.rows[0].next_id), topping, 'Toppings', '0.25', 100]
+    );
+  }
+
+  hasVerifiedInventoryToppingsCategory = true;
+}
+
 /**
  * Adds a unique auto-incrementing customer_id and a free_drink_credits counter
  * to the existing customer_rewards_accounts table.
@@ -154,7 +201,9 @@ module.exports = {
   ensureCustomerIdAndCreditsColumns,
   ensureOrderPaymentsTable,
   ensureOrderVoidsTable,
+  ensureInventoryToppingsCategory,
   ensureProductActiveColumn,
+  ensureProductCategoriesTable,
   ensureRewardTransactionsTable,
   ensureRewardsAccountsTable,
   ensureReportingTables,

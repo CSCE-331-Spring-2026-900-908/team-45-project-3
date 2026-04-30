@@ -63,40 +63,43 @@
         </section>
 
         <section id="staff-customization-panel" class="content-card dashboard-pane" hidden>
-          <p class="section-label">Customization</p>
-          <h3 id="staff-selected-product" class="compact-title">Select a drink</h3>
-          <p id="staff-selected-price" class="muted-line">Select a product to customize.</p>
-
-          <div class="compact-stack pane-scroll">
-            <div class="checkout-grid staff-customization-grid">
-              <label class="field-block">
-                <span>Qty</span>
-                <div class="quantity-stepper">
-                  <button id="staff-qty-decrement" class="ghost-button mini-button quantity-stepper-button"
-                    type="button" aria-label="Decrease quantity">
-                    -
-                  </button>
-                  <input id="staff-qty" class="numeric-input" type="number" min="1" value="1" readonly
-                    inputmode="none" aria-live="polite" />
-                  <button id="staff-qty-increment" class="ghost-button mini-button quantity-stepper-button"
-                    type="button" aria-label="Increase quantity">
-                    +
-                  </button>
-                </div>
-              </label>
-              <label class="field-block">
-                <span>Size</span>
-                <select id="staff-size">
-                  <option>Small</option>
-                  <option selected>Medium</option>
-                  <option>Large</option>
-                </select>
-              </label>
+          <div class="section-heading">
+            <div>
+              <p class="section-label">Customize Drink</p>
+              <h3 id="staff-selected-product" class="compact-title">Select a drink</h3>
+              <p id="staff-selected-price" class="muted-line">Select a product to customize.</p>
             </div>
+          </div>
+
+          <div class="stack-layout compact-gap">
+            <label class="field-block">
+              <span>Quantity</span>
+              <div class="quantity-stepper">
+                <button id="staff-qty-decrement" class="ghost-button mini-button quantity-stepper-button"
+                  type="button" aria-label="Decrease quantity">
+                  -
+                </button>
+                <input id="staff-qty" class="numeric-input" type="number" min="1" value="1" readonly
+                  inputmode="none" aria-live="polite" />
+                <button id="staff-qty-increment" class="ghost-button mini-button quantity-stepper-button"
+                  type="button" aria-label="Increase quantity">
+                  +
+                </button>
+              </div>
+            </label>
+
+            <fieldset class="field-block">
+              <legend>Size</legend>
+              <div class="customer-choice-grid">
+                <label><input type="radio" name="staff-size" value="Small" /> <span>Small</span><span class="option-price">-$0.50</span></label>
+                <label><input type="radio" name="staff-size" value="Medium" checked /> <span>Medium</span><span class="option-price">$0.00</span></label>
+                <label><input type="radio" name="staff-size" value="Large" /> <span>Large</span><span class="option-price">+$1.50</span></label>
+              </div>
+            </fieldset>
 
             <label class="field-block">
-              <span>Sugar: <strong id="staff-sugar-value">100%</strong></span>
-              <input id="staff-sugar" type="range" min="0" max="200" step="25" value="100" />
+              <span>Sugar: <strong id="staff-sugar-value">50%</strong></span>
+              <input id="staff-sugar" type="range" min="0" max="200" step="25" value="50" />
             </label>
 
             <fieldset class="field-block">
@@ -104,25 +107,22 @@
               <div class="customer-choice-grid staff-ice-grid">
                 <label><input type="radio" name="staff-ice" value="0" /> 0%</label>
                 <label><input type="radio" name="staff-ice" value="25" /> 25%</label>
-                <label><input type="radio" name="staff-ice" value="50" /> 50%</label>
+                <label><input type="radio" name="staff-ice" value="50" checked /> 50%</label>
                 <label><input type="radio" name="staff-ice" value="75" /> 75%</label>
-                <label><input type="radio" name="staff-ice" value="100" checked /> 100%</label>
+                <label><input type="radio" name="staff-ice" value="100" /> 100%</label>
                 <label><input type="radio" name="staff-ice" value="200" /> Hot</label>
               </div>
             </fieldset>
 
-            <fieldset class="check-fieldset-compact">
+            <fieldset class="field-block">
               <legend>Toppings</legend>
-              <div class="check-grid-compact">
-                <label><input type="checkbox" name="staff-topping" value="Boba" /> Boba</label>
-                <label><input type="checkbox" name="staff-topping" value="Jelly" /> Jelly</label>
-                <label><input type="checkbox" name="staff-topping" value="Pudding" /> Pudding</label>
-                <label><input type="checkbox" name="staff-topping" value="Crystal" /> Crystal</label>
-              </div>
+              <div class="check-grid customer-topping-grid staff-topping-grid"></div>
             </fieldset>
-          </div>
 
-          <button id="staff-add-to-cart" class="action-button full-width">Add to Order</button>
+            <div class="button-row">
+              <button id="staff-add-to-cart" class="action-button" type="button">Add to Order</button>
+            </div>
+          </div>
         </section>
 
         <section class="content-card dashboard-pane">

@@ -1,5 +1,5 @@
 const { query, getPool, withTransaction } = require('./client');
-const { ensureProductActiveColumn } = require('./schema');
+const { ensureInventoryToppingsCategory, ensureProductActiveColumn, ensureProductCategoriesTable } = require('./schema');
 const { mapProduct, toMoney } = require('./helpers');
 
 /**
@@ -41,8 +41,9 @@ async function fetchMenuProducts(includeInactive = false) {
  */
 async function fetchProductCategories() {
   await ensureProductActiveColumn();
+  await ensureProductCategoriesTable();
   const { rows } = await query(
-    "SELECT DISTINCT category FROM products WHERE active = TRUE AND category IS NOT NULL AND trim(category) <> '' ORDER BY category"
+    'SELECT name AS category FROM product_categories ORDER BY lower(name)'
   );
   return rows.map((row) => row.category);
 }
@@ -52,6 +53,7 @@ async function fetchProductCategories() {
  * @returns {Promise<Array<{ id: number, name: string, category: string, price: number, quantity: number }>>}
  */
 async function fetchInventoryItems() {
+  await ensureInventoryToppingsCategory();
   const { rows } = await query('SELECT id, name, category, price, quantity FROM inventory ORDER BY id');
   return rows.map((row) => ({
     id: Number(row.id),

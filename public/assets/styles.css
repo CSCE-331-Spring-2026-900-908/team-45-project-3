@@ -284,6 +284,23 @@ h1 { font-size: clamp(2.4rem, 6vw, 4.6rem); line-height: 0.96; max-width: 12ch; 
 .cart-list { display: grid; gap: 12px; }
 .cart-row { display: flex; justify-content: space-between; gap: 16px; padding: 14px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface-strong); }
 .cart-actions { display: grid; justify-items: end; gap: 10px; }
+.customer-cart-action-buttons { display: flex; gap: 8px; align-items: center; }
+.customer-cart-remove {
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
+  padding: 0;
+  border-color: rgba(180, 28, 28, 0.35);
+  background: #b91c1c;
+  color: #ffffff;
+  font-weight: 800;
+  line-height: 1;
+}
+.customer-cart-remove:hover,
+.customer-cart-remove:focus-visible {
+  background: #991b1b;
+  color: #ffffff;
+}
 .summary-grid { display: grid; gap: 10px; margin-bottom: 18px; }
 .summary-grid div { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
 .checkout-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
@@ -863,7 +880,7 @@ h1 { font-size: clamp(2.4rem, 6vw, 4.6rem); line-height: 0.96; max-width: 12ch; 
 }
 .customer-category-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 16px;
 }
 .customer-category-button {
@@ -904,8 +921,14 @@ h1 { font-size: clamp(2.4rem, 6vw, 4.6rem); line-height: 0.96; max-width: 12ch; 
 .customer-category-milk-tea {
   background: linear-gradient(160deg, #6f4b3d, #b9814d 58%, #f0d0ab);
 }
-.customer-category-tea {
+.customer-category-fruit-tea {
   background: linear-gradient(160deg, #3f6d59, #68a87d 52%, #d2ebcf);
+}
+.customer-category-tea {
+  background: linear-gradient(160deg, #31515c, #587f75 52%, #b8d8c7);
+}
+.customer-category-coffee {
+  background: linear-gradient(160deg, #3b2a24, #7a5142 55%, #d3aa82);
 }
 .customer-category-seasonal {
   background: linear-gradient(160deg, #7b4e2e, #c97d42 50%, #f3c76b);
@@ -974,8 +997,14 @@ body.high-contrast .customer-tile-slushy {
 .customer-tile-milk-tea {
   background: linear-gradient(145deg, #d0a26f 0%, #9b6541 48%, #553124 100%);
 }
-.customer-tile-tea {
+.customer-tile-fruit-tea {
   background: linear-gradient(145deg, #85b57b 0%, #4f8567 48%, #1d4437 100%);
+}
+.customer-tile-tea {
+  background: linear-gradient(145deg, #446a70 0%, #2c4b50 48%, #183135 100%);
+}
+.customer-tile-coffee {
+  background: linear-gradient(145deg, #8b6250 0%, #55372d 48%, #241815 100%);
 }
 .customer-tile-seasonal {
   background: linear-gradient(145deg, #f0b953 0%, #d26d3c 50%, #77361f 100%);
@@ -1063,7 +1092,7 @@ body.high-contrast .customer-tile-slushy {
   width: min(860px, calc(100% - 24px));
 }
 .staff-customization-dialog {
-  width: min(520px, calc(100% - 24px));
+  width: min(560px, calc(100% - 24px));
 }
 .customer-dialog::backdrop {
   background: rgba(36, 23, 21, 0.48);
@@ -1100,6 +1129,12 @@ body.high-contrast .customer-tile-slushy {
   border-radius: 16px;
   background: rgba(255, 251, 245, 0.94);
   color: var(--ink);
+}
+.option-price {
+  margin-left: auto;
+  color: var(--accent-dark);
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 /* ── Strict High Contrast Mode (White on Black) ────────────────────────── */
@@ -1174,6 +1209,10 @@ body.high-contrast .customer-topping-grid label {
   box-shadow: none !important;
 }
 
+body.high-contrast .option-price {
+  color: #ffd400 !important;
+}
+
 /* Action buttons */
 body.high-contrast .action-button,
 body.high-contrast .customer-accessibility-fab {
@@ -1221,6 +1260,12 @@ body.high-contrast .customer-contrast-toggle[aria-pressed='true'] {
   background: #ffd400 !important;
   color: #000000 !important;
   border-color: #ffffff !important;
+}
+
+body.high-contrast .customer-cart-remove {
+  background: #ff2a6d !important;
+  color: #000000 !important;
+  border: 2px solid #ffffff !important;
 }
 
 body.high-contrast .customer-accessibility-label {

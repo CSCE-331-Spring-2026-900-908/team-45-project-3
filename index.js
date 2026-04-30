@@ -172,6 +172,23 @@ function createApp() {
     }
   });
 
+  app.post('/api/auth/logout', (req, res, next) => {
+    req.logout((error) => {
+      if (error) {
+        next(error);
+        return;
+      }
+      req.session.destroy((destroyError) => {
+        if (destroyError) {
+          next(destroyError);
+          return;
+        }
+        res.clearCookie('connect.sid');
+        res.json({ authenticated: false });
+      });
+    });
+  });
+
   app.get('/api/customer/rewards/session', asyncHandler(async (req, res) => {
     const rewardsPhoneNumber = req.session.customerRewardsPhoneNumber;
     if (!rewardsPhoneNumber) {
@@ -218,16 +235,16 @@ function createApp() {
   }));
 
   // --- Read-only API routes ---
-  app.get('/api/products', asyncHandler(async (_, res) => {
-    const [items, availability] = await Promise.all([
-      db.fetchProducts(),
-      db.fetchProductAvailability(),
-    ]);
+  app.get('/api/products', asyncHandler(async (req, res) => {
+    const includeAvailability = req.query.availability !== 'false';
+    const [items, availability] = includeAvailability
+      ? await Promise.all([db.fetchProducts(), db.fetchProductAvailability()])
+      : [await db.fetchProducts(), null];
     res.json({
       source: 'database',
       items: items.map((item) => ({
         ...item,
-        outOfStock: availability.get(item.id) === false,
+        outOfStock: availability ? availability.get(item.id) === false : false,
       })),
     });
   }));

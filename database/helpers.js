@@ -1,5 +1,7 @@
 const TAX_RATE = 0.0625;
-const SIZE_PRICE_DELTA = 1;
+const SMALL_SIZE_PRICE_DELTA = -0.5;
+const LARGE_SIZE_PRICE_DELTA = 1.5;
+const TOPPING_PRICE_DELTA = 0.25;
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -44,9 +46,14 @@ function normalizePercent(value, fallback = 100) {
 
 function applySizePriceDelta(basePrice, size) {
   const price = toMoney(basePrice);
-  if (size === 'Small') return toMoney(price - SIZE_PRICE_DELTA);
-  if (size === 'Large') return toMoney(price + SIZE_PRICE_DELTA);
+  if (size === 'Small') return toMoney(price + SMALL_SIZE_PRICE_DELTA);
+  if (size === 'Large') return toMoney(price + LARGE_SIZE_PRICE_DELTA);
   return price;
+}
+
+function applyToppingPriceDelta(price, toppings) {
+  const toppingCount = Array.isArray(toppings) ? toppings.length : 0;
+  return toMoney(price + toppingCount * TOPPING_PRICE_DELTA);
 }
 
 function addRequired(map, ingredientId, amount) {
@@ -109,7 +116,7 @@ function buildLineSummary(line, product) {
   if (!product) {
     return null;
   }
-  const unitPrice = applySizePriceDelta(product.price, line.size);
+  const unitPrice = applyToppingPriceDelta(applySizePriceDelta(product.price, line.size), line.toppings);
   const lineTotal = toMoney(unitPrice * line.quantity);
   const summary = {
     productId: product.id,
@@ -172,6 +179,7 @@ module.exports = {
   TAX_RATE,
   addRequired,
   applySizePriceDelta,
+  applyToppingPriceDelta,
   buildLineSummary,
   buildPaymentBreakdown,
   emptyOrderPreview,

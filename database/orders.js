@@ -38,18 +38,35 @@ async function fetchProductAvailability() {
   return withTransaction(async (client) => {
     const products = await fetchProductsById(client);
     const availability = new Map();
+    const productIds = Array.from(products.keys());
 
-    for (const product of products.values()) {
-      const requiredIngredients = await calculateRequiredIngredients(client, [{
-        productId: product.id,
-        quantity: 1,
-        size: 'Medium',
-        sugarPercent: 0,
-        toppings: [],
-      }]);
-      const shortages = await findIngredientShortages(client, requiredIngredients);
-      availability.set(product.id, shortages.length === 0);
+    productIds.forEach((productId) => {
+      availability.set(productId, true);
+    });
+
+    if (!productIds.length) {
+      return availability;
     }
+
+    const { rows } = await client.query(
+      'SELECT pi.product_id, i.name, i.quantity, SUM(pi.quantity_used) AS required_quantity ' +
+      'FROM product_ingredients pi ' +
+      'JOIN inventory i ON i.id = pi.ingredient_id ' +
+      'WHERE pi.product_id = ANY($1::int[]) ' +
+      'GROUP BY pi.product_id, i.id, i.name, i.quantity',
+      [productIds]
+    );
+
+    rows.forEach((row) => {
+      const ingredientName = row.name || '';
+      if (isUnlimitedIngredient(ingredientName) || isPackagingIngredient(ingredientName)) {
+        return;
+      }
+
+      if (Number(row.quantity) < Number(row.required_quantity)) {
+        availability.set(Number(row.product_id), false);
+      }
+    });
 
     return availability;
   });

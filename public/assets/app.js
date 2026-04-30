@@ -1,11 +1,14 @@
 const ACCESS_KEY = 'portalAccessRole';
 const SESSION_KEY = 'portalSession';
 const EMPTY_PREVIEW = { lineItems: [], subtotal: 0, tax: 0, total: 0, shortages: [], canSubmit: false };
+const DEFAULT_TOPPINGS = ['Boba', 'Crystal Boba', 'Lychee Jelly', 'Pudding'];
 
 const staffState = {
   products: [],
+  toppings: DEFAULT_TOPPINGS,
   cart: [],
   selectedProductId: null,
+  editingCartIndex: null,
   preview: { ...EMPTY_PREVIEW },
   lastCustomizationTrigger: null,
   isSubmittingOrder: false,
@@ -19,9 +22,14 @@ const managerState = {
 const CUSTOMER_CONTRAST_KEY = 'customerHighContrast';
 const CUSTOMER_TEXT_SIZE_KEY = 'customerTextScale';
 const CUSTOMER_ZOOM_KEY = 'customerZoomScale';
+const CUSTOMER_PRODUCTS_CACHE_KEY = 'customerProductsCache';
+const SMALL_SIZE_PRICE_DELTA = -0.5;
+const LARGE_SIZE_PRICE_DELTA = 1.5;
+const TOPPING_PRICE_DELTA = 0.25;
+const CUSTOMER_FALLBACK_TOPPINGS = DEFAULT_TOPPINGS;
 const CUSTOMER_PHONE_DIGIT_PATTERN = /\d/g;
 const CUSTOMER_PHONE_NUMBER_LENGTH = 10;
-const CUSTOMER_CATEGORY_ORDER = ['boba-tea', 'milk-tea', 'slushy', 'tea', 'seasonal'];
+const CUSTOMER_CATEGORY_ORDER = ['boba-tea', 'milk-tea', 'slushy', 'fruit-tea', 'tea', 'coffee', 'seasonal'];
 
 const CUSTOMER_CATEGORY_META = {
   'boba-tea': {
@@ -37,9 +45,17 @@ const CUSTOMER_CATEGORY_META = {
     label: 'Slushies',
     description: 'Ice-blended drinks perfect for beating the heat.',
   },
+  'fruit-tea': {
+    label: 'Fruit Tea',
+    description: 'Fresh teas, fruit blends, and lighter refreshers.',
+  },
   'tea': {
     label: 'Tea',
-    description: 'Fresh teas, fruit blends, and lighter refreshers.',
+    description: 'Classic brewed teas and simple tea-forward drinks.',
+  },
+  'coffee': {
+    label: 'Coffee',
+    description: 'Coffee drinks, espresso builds, and creamy caffeinated favorites.',
   },
   'seasonal': {
     label: 'Seasonal',
@@ -48,6 +64,7 @@ const CUSTOMER_CATEGORY_META = {
 };
 const customerState = {
   products: [],
+  toppings: CUSTOMER_FALLBACK_TOPPINGS,
   activeCategory: 'boba-tea',
   cart: [],
   preview: { ...EMPTY_PREVIEW },
@@ -55,6 +72,7 @@ const customerState = {
   rewardCreditApplied: false,
   profile: null,
   selectedProductId: null,
+  editingCartIndex: null,
   highContrast: false,
   textScale: 1,
   zoomScale: 1,
@@ -111,12 +129,18 @@ const JS_STATIC_STRINGS = [
   'Out of stock.',
   'Open customization options.',
   'Base price',
+  'Current item',
+  'each',
+  'total',
   'Adjust size, sweetness, ice, and toppings.',
+  'Large +$1.50, small -$0.50, toppings +$0.25 each.',
+  'Update Item',
   'All options are keyboard accessible and remain readable for translation tools.',
   'No products are available in this category right now.',
   'Your cart is empty. Pick a drink to customize and add it here.',
   'Submitting',
   'Ordered',
+  'Edit',
   'Recommendation',
   'Rewards program?',
   'Customization?',
@@ -139,8 +163,9 @@ function collectAllTranslatableStrings() {
     .map((el) => el.dataset.i18n)
     .filter(Boolean);
   const productTexts = customerState.products.flatMap((p) => [p.name, p.category]);
+  const toppingTexts = customerState.toppings || [];
   const categoryTexts = Object.values(CUSTOMER_CATEGORY_META).flatMap((m) => [m.label, m.description]);
-  return [...new Set([...staticTexts, ...productTexts, ...categoryTexts, ...JS_STATIC_STRINGS])].filter(Boolean);
+  return [...new Set([...staticTexts, ...productTexts, ...toppingTexts, ...categoryTexts, ...JS_STATIC_STRINGS])].filter(Boolean);
 }
 
 async function fetchTranslations(texts, lang) {
@@ -178,6 +203,7 @@ async function applyLanguage(lang) {
     renderCustomerProducts();
     renderCustomerRewards();
     renderCustomerCart();
+    renderCustomerToppingOptions();
     return;
   }
 
@@ -204,6 +230,7 @@ async function applyLanguage(lang) {
   renderCustomerProducts();
   renderCustomerRewards();
   renderCustomerCart();
+  renderCustomerToppingOptions();
 
 
   //Prefetches other translations to ensure seamless transitions
@@ -224,6 +251,7 @@ const INVENTORY_CATEGORY_OPTIONS = [
   'Milk Flavor',
   'Tea Flavor',
   'Boba Type',
+  'Toppings',
   'Utensil',
   'Cup',
   'Lid',
@@ -244,6 +272,15 @@ function setPortalAccess(role) {
 
 function clearRoleSession() {
   sessionStorage.removeItem(SESSION_KEY);
+}
+
+async function logoutAuthSession() {
+  clearRoleSession();
+  try {
+    await fetchJson('/api/auth/logout', { method: 'POST' });
+  } catch (error) {
+    console.warn('Unable to clear server auth session:', error);
+  }
 }
 
 function saveRoleSession(session) {
@@ -372,7 +409,7 @@ function escapeHtml(value) {
 }
 
 function defaultCustomization() {
-  return { quantity: 1, size: 'Medium', sugarPercent: 100, icePercent: 100, toppings: [] };
+  return { quantity: 1, size: 'Medium', sugarPercent: 50, icePercent: 50, toppings: [] };
 }
 
 function readPercentInput(id, fallback) {
@@ -394,19 +431,69 @@ function readStaffIcePercent() {
 }
 
 function readCustomizationForm() {
+  const sizeField = document.querySelector('input[name="staff-size"]:checked');
   return {
     quantity: Math.max(1, Number(document.getElementById('staff-qty').value) || 1),
-    size: document.getElementById('staff-size').value,
-    sugarPercent: readPercentInput('staff-sugar', 100),
+    size: sizeField ? sizeField.value : 'Medium',
+    sugarPercent: readPercentInput('staff-sugar', 50),
     icePercent: readStaffIcePercent(),
     toppings: Array.from(document.querySelectorAll('input[name="staff-topping"]:checked')).map((element) => element.value),
   };
 }
 
+function getToppingNamesFromInventory(items) {
+  const toppings = (items || [])
+    .filter((item) => String(item.category || '').trim().toLowerCase() === 'toppings')
+    .map((item) => String(item.name || '').trim())
+    .filter(Boolean);
+  return toppings.length ? [...new Set(toppings)].sort((a, b) => a.localeCompare(b)) : DEFAULT_TOPPINGS;
+}
+
+function renderStaffToppingOptions(selectedToppings = []) {
+  const container = document.querySelector('.staff-topping-grid');
+  if (!container) {
+    return;
+  }
+
+  const selected = new Set(selectedToppings);
+  container.innerHTML = (staffState.toppings.length ? staffState.toppings : DEFAULT_TOPPINGS).map((topping) => `
+    <label>
+      <input type="checkbox" name="staff-topping" value="${escapeHtml(topping)}"${selected.has(topping) ? ' checked' : ''} />
+      <span>${escapeHtml(topping)}</span>
+      <span class="option-price">+$0.25</span>
+    </label>
+  `).join('');
+  renderStaffCustomizationPrice();
+}
+
+function renderStaffCustomizationPrice() {
+  const product = getSelectedProduct();
+  if (!product) {
+    return;
+  }
+
+  const customization = readCustomizationForm();
+  const unitPrice = calculateCustomizedUnitPrice(product.price, customization);
+  const total = Number((unitPrice * customization.quantity).toFixed(2));
+  setText(
+    'staff-selected-price',
+    `Current item ${formatCurrency(unitPrice)}${customization.quantity > 1 ? ` each, ${formatCurrency(total)} total` : ''}.`
+  );
+}
+
+function setStaffSelectedProductText(product) {
+  setText('staff-selected-product', product ? product.name : 'No in-stock product selected');
+  if (product) {
+    renderStaffCustomizationPrice();
+  } else {
+    setText('staff-selected-price', 'Products marked out of stock cannot be customized.');
+  }
+}
+
 function resetCustomizationForm() {
   const defaults = defaultCustomization();
   document.getElementById('staff-qty').value = defaults.quantity;
-  document.getElementById('staff-size').value = defaults.size;
+  document.querySelector(`input[name="staff-size"][value="${defaults.size}"]`).checked = true;
   
   document.getElementById('staff-sugar').value = defaults.sugarPercent;
   setText('staff-sugar-value', `${defaults.sugarPercent}%`);
@@ -416,9 +503,30 @@ function resetCustomizationForm() {
     defaultIceField.checked = true;
   }
   
-  document.querySelectorAll('input[name="staff-topping"]').forEach((element) => {
-    element.checked = false;
-  });
+  renderStaffToppingOptions();
+  renderStaffCustomizationPrice();
+}
+
+function populateStaffCustomizationForm(line) {
+  setStaffQuantity(line.quantity);
+  const sizeField = document.querySelector(`input[name="staff-size"][value="${line.size || 'Medium'}"]`);
+  if (sizeField) {
+    sizeField.checked = true;
+  }
+
+  const sugarInput = document.getElementById('staff-sugar');
+  if (sugarInput) {
+    sugarInput.value = String(line.sugarPercent ?? 50);
+    setText('staff-sugar-value', `${sugarInput.value}%`);
+  }
+
+  const iceField = document.querySelector(`input[name="staff-ice"][value="${line.icePercent ?? 50}"]`);
+  if (iceField) {
+    iceField.checked = true;
+  }
+
+  renderStaffToppingOptions(line.toppings || []);
+  renderStaffCustomizationPrice();
 }
 
 function setStaffQuantity(nextValue) {
@@ -428,6 +536,7 @@ function setStaffQuantity(nextValue) {
   }
 
   quantityInput.value = String(Math.max(1, Number(nextValue) || 1));
+  renderStaffCustomizationPrice();
 }
 
 function adjustStaffQuantity(delta) {
@@ -456,13 +565,14 @@ function setupStaffCustomizationDialog() {
   panel.classList.remove('content-card', 'dashboard-pane');
   panel.classList.add('customer-dialog-form', 'staff-customization-panel');
 
+  const heading = panel.querySelector('.section-heading');
   const closeButton = document.createElement('button');
   closeButton.id = 'staff-close-customization-dialog';
   closeButton.className = 'ghost-button mini-button staff-customization-close';
   closeButton.type = 'button';
   closeButton.setAttribute('aria-label', 'Close customization dialog');
   closeButton.textContent = 'Close';
-  panel.insertBefore(closeButton, panel.firstChild);
+  heading?.appendChild(closeButton);
 
   dialog.appendChild(panel);
   document.body.insertBefore(dialog, document.querySelector('script[src="/assets/app.js"]'));
@@ -479,14 +589,24 @@ function getStaffCustomizationDialogFocusableElements() {
   )).filter((element) => !element.hasAttribute('hidden'));
 }
 
-function openStaffCustomizationDialog(trigger = null) {
+function openStaffCustomizationDialog(trigger = null, cartIndex = null) {
   staffState.lastCustomizationTrigger = trigger || (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+  staffState.editingCartIndex = Number.isInteger(cartIndex) ? cartIndex : null;
   const dialog = document.getElementById('staff-customization-dialog');
   if (!dialog) {
     return;
   }
 
-  resetCustomizationForm();
+  const line = Number.isInteger(staffState.editingCartIndex) ? staffState.cart[staffState.editingCartIndex] : null;
+  if (line) {
+    staffState.selectedProductId = line.productId;
+    setStaffSelectedProductText(getSelectedProduct());
+    populateStaffCustomizationForm(line);
+    document.getElementById('staff-add-to-cart').textContent = 'Update Item';
+  } else {
+    resetCustomizationForm();
+    document.getElementById('staff-add-to-cart').textContent = 'Add to Order';
+  }
 
   if (typeof dialog.showModal === 'function') {
     dialog.showModal();
@@ -514,6 +634,8 @@ function closeStaffCustomizationDialog() {
     dialog.close();
   } else {
     dialog?.removeAttribute('open');
+    staffState.editingCartIndex = null;
+    document.getElementById('staff-add-to-cart').textContent = 'Add to Order';
     restoreStaffCustomizationDialogFocus();
   }
 }
@@ -521,25 +643,124 @@ function closeStaffCustomizationDialog() {
 function refreshCustomerProductsInBackground() {
   fetchJson('/api/products')
     .then((productsData) => {
-      customerState.products = productsData.items || customerState.products;
-      renderCustomerCategoryButtons();
-      renderCustomerProducts();
+      setCustomerProducts(productsData.items || customerState.products, true);
+      saveCustomerProductsCache(customerState.products);
+      setStatus('customer-products-status', 'Live menu loaded. Choose a category to begin.', 'success');
     })
     .catch((error) => {
       console.warn('Unable to refresh customer products after checkout:', error);
     });
 }
 
+function saveCustomerProductsCache(products) {
+  try {
+    localStorage.setItem(CUSTOMER_PRODUCTS_CACHE_KEY, JSON.stringify({
+      savedAt: Date.now(),
+      items: Array.isArray(products) ? products : [],
+    }));
+  } catch (error) {
+    console.warn('Unable to cache customer products:', error);
+  }
+}
+
+function loadCustomerProductsCache() {
+  try {
+    const cached = JSON.parse(localStorage.getItem(CUSTOMER_PRODUCTS_CACHE_KEY) || 'null');
+    return Array.isArray(cached?.items) ? cached.items : [];
+  } catch {
+    return [];
+  }
+}
+
+function setCustomerProducts(products, preserveActiveCategory = false) {
+  customerState.products = Array.isArray(products) ? products : [];
+  const firstNonEmptyCategory = CUSTOMER_CATEGORY_ORDER.find((key) =>
+    customerState.products.some((item) => normalizeCustomerCategory(item) === key)
+  );
+  const currentCategoryHasItems = customerState.products.some((item) =>
+    normalizeCustomerCategory(item) === customerState.activeCategory
+  );
+  if (!preserveActiveCategory || !currentCategoryHasItems) {
+    customerState.activeCategory = firstNonEmptyCategory || 'fruit-tea';
+  }
+  renderCustomerCategoryButtons();
+  renderCustomerProducts();
+}
+
 function customizationMatches(a, b) {
+  const toppingsA = [...(a.toppings || [])].sort();
+  const toppingsB = [...(b.toppings || [])].sort();
   return a.size === b.size && 
          a.sugarPercent === b.sugarPercent && 
          a.icePercent === b.icePercent && 
-         JSON.stringify(a.toppings.sort()) === JSON.stringify(b.toppings.sort());
+         JSON.stringify(toppingsA) === JSON.stringify(toppingsB);
 }
 
 function customizationSummary(item) {
   const toppings = item.toppings.length ? `, ${item.toppings.join(', ')}` : '';
   return `${item.size}, ${item.sugarPercent}% sugar, ${formatIceLevel(item.icePercent)}${toppings}`;
+}
+
+function calculateCustomizedUnitPrice(basePrice, customization) {
+  let unitPrice = Number(basePrice) || 0;
+  if (customization.size === 'Small') {
+    unitPrice += SMALL_SIZE_PRICE_DELTA;
+  } else if (customization.size === 'Large') {
+    unitPrice += LARGE_SIZE_PRICE_DELTA;
+  }
+  unitPrice += (customization.toppings || []).length * TOPPING_PRICE_DELTA;
+  return Number(unitPrice.toFixed(2));
+}
+
+function renderCustomerDialogPrice() {
+  const product = getCustomerSelectedProduct();
+  if (!product) {
+    return;
+  }
+
+  const customization = readCustomerCustomizationForm();
+  const unitPrice = calculateCustomizedUnitPrice(product.price, customization);
+  const total = Number((unitPrice * customization.quantity).toFixed(2));
+  setText(
+    'customer-dialog-price',
+    `${t('Current item')} ${formatCurrency(unitPrice)}${customization.quantity > 1 ? ` ${t('each')}, ${formatCurrency(total)} ${t('total')}` : ''}.`
+  );
+}
+
+function renderCustomerToppingOptions(selectedToppings = []) {
+  const container = document.querySelector('.customer-topping-grid');
+  if (!container) {
+    return;
+  }
+
+  const selected = new Set(selectedToppings);
+  const toppings = customerState.toppings.length ? customerState.toppings : CUSTOMER_FALLBACK_TOPPINGS;
+  container.innerHTML = toppings.map((topping) => `
+    <label>
+      <input type="checkbox" name="customer-topping" value="${escapeHtml(topping)}"${selected.has(topping) ? ' checked' : ''} />
+      <span>${escapeHtml(t(topping))}</span>
+      <span class="option-price">+$0.25</span>
+    </label>
+  `).join('');
+}
+
+async function loadCustomerToppingsFromInventory() {
+  try {
+    const data = await fetchJson('/api/inventory');
+    const toppings = (data.items || [])
+      .filter((item) => String(item.category || '').trim().toLowerCase() === 'toppings')
+      .map((item) => String(item.name || '').trim())
+      .filter(Boolean);
+
+    const selectedToppings = Array.from(document.querySelectorAll('input[name="customer-topping"]:checked'))
+      .map((element) => element.value);
+    customerState.toppings = toppings.length ? [...new Set(toppings)].sort((a, b) => a.localeCompare(b)) : CUSTOMER_FALLBACK_TOPPINGS;
+    renderCustomerToppingOptions(selectedToppings);
+  } catch (error) {
+    console.warn('Unable to load customer toppings from inventory:', error);
+    customerState.toppings = CUSTOMER_FALLBACK_TOPPINGS;
+    renderCustomerToppingOptions();
+  }
 }
 
 function mergePreviewLineItems(cart, previewLineItems) {
@@ -564,19 +785,43 @@ function getFirstAvailableProduct(products) {
   return (products || []).find((item) => !item.outOfStock) || null;
 }
 
+function getMenuCategoryKey(category) {
+  const value = String(category || '').toLowerCase();
+  if (value.includes('season')) return 'seasonal';
+  if (value.includes('coffee') || value.includes('espresso') || value.includes('latte') || value.includes('mocha')) return 'coffee';
+  if (value.includes('slush')) return 'slushies';
+  if (value.includes('fruit')) return 'fruit-tea';
+  if (value.includes('milk')) return 'milk-tea';
+  if (value.includes('boba') || value.includes('pearl') || value.includes('tapioca') || value.includes('brown sugar')) return 'boba-tea';
+  if (value.includes('tea')) return 'tea';
+  return value.trim();
+}
+
+function getMenuCategoryLabel(category) {
+  const labels = {
+    'boba-tea': 'Boba Tea',
+    'milk-tea': 'Milk Tea',
+    slushies: 'Slushies',
+    'fruit-tea': 'Fruit Tea',
+    tea: 'Tea',
+    coffee: 'Coffee',
+    seasonal: 'Seasonal',
+  };
+  return labels[getMenuCategoryKey(category)] || category || 'Uncategorized';
+}
+
 function renderStaffProducts() {
   const container = document.getElementById('staff-products');
   const category = document.getElementById('staff-category-filter').value;
   const visible = category === 'all'
     ? staffState.products
-    : staffState.products.filter((item) => item.category === category);
+    : staffState.products.filter((item) => getMenuCategoryKey(item.category) === getMenuCategoryKey(category));
 
   const selectedVisibleProduct = visible.find((item) => Number(item.id) === Number(staffState.selectedProductId) && !item.outOfStock);
   if (!selectedVisibleProduct) {
     const fallbackProduct = getFirstAvailableProduct(visible);
     staffState.selectedProductId = fallbackProduct ? fallbackProduct.id : null;
-    setText('staff-selected-product', fallbackProduct ? fallbackProduct.name : 'No in-stock product selected');
-    setText('staff-selected-price', fallbackProduct ? `Base price ${formatCurrency(fallbackProduct.price)} before size adjustment.` : 'Products marked out of stock cannot be customized.');
+    setStaffSelectedProductText(fallbackProduct);
   }
 
   container.innerHTML = '';
@@ -589,7 +834,7 @@ function renderStaffProducts() {
     card.setAttribute('aria-pressed', staffState.selectedProductId === item.id ? 'true' : 'false');
     card.setAttribute('aria-disabled', isDisabled ? 'true' : 'false');
     card.innerHTML = `
-      <p class="section-label">${escapeHtml(item.category)}</p>
+      <p class="section-label">${escapeHtml(getMenuCategoryLabel(item.category))}</p>
       <h3>${escapeHtml(item.name)}</h3>
       <p class="price-line">$${Number(item.price).toFixed(2)}</p>
       <p class="muted-line">${isDisabled ? 'Out of stock.' : 'Click anywhere on this card to customize.'}</p>
@@ -602,8 +847,7 @@ function renderStaffProducts() {
         return;
       }
       staffState.selectedProductId = item.id;
-      setText('staff-selected-product', item.name);
-      setText('staff-selected-price', `Base price ${formatCurrency(item.price)} before size adjustment.`);
+      setStaffSelectedProductText(item);
       renderStaffProducts();
       openStaffCustomizationDialog(document.querySelector('.product-card.selected') || card);
       setStatus('staff-cart-status', `Selected ${item.name}. Adjust the options and add it to the cart.`, 'neutral');
@@ -642,10 +886,16 @@ function renderCart() {
       </div>
       <div class="cart-actions">
         <strong>${formatCurrency(line.lineTotal)}</strong>
-        <button class="ghost-button mini-button" type="button">Remove</button>
+        <div class="customer-cart-action-buttons">
+          <button class="ghost-button mini-button staff-cart-edit" type="button">Edit</button>
+          <button class="ghost-button mini-button customer-cart-remove staff-cart-remove" type="button" aria-label="Remove ${escapeHtml(line.name)}">X</button>
+        </div>
       </div>
     `;
-    row.querySelector('button').addEventListener('click', async () => {
+    row.querySelector('.staff-cart-edit')?.addEventListener('click', () => {
+      openStaffCustomizationDialog(row.querySelector('.staff-cart-edit'), index);
+    });
+    row.querySelector('.staff-cart-remove')?.addEventListener('click', async () => {
       staffState.cart.splice(index, 1);
       renderCart();
       await refreshPreview();
@@ -744,14 +994,14 @@ async function bootStaff() {
   if (!session) {
     try {
       const status = await fetchJson('/api/auth/status');
-      if (status.authenticated && (status.role === 'staff' || status.role === 'manager')) {
+      if (status.authenticated && status.role === 'staff') {
         session = status;
         saveRoleSession(session);
       }
     } catch (e) { console.log("No OAuth session."); }
   }
 
-  if (session && (session.role === 'staff' || session.role === 'manager')) {
+  if (session && session.role === 'staff') {
     showStaffWorkspace(session);
     await loadStaffProducts();
   }
@@ -801,13 +1051,31 @@ async function bootStaff() {
     if (!product) return setStatus('staff-cart-status', 'Select a product first!', 'error');
 
     const customization = readCustomizationForm();
+    const unitPrice = calculateCustomizedUnitPrice(product.price, customization);
+    const updatedLine = {
+      ...product,
+      productId: product.id,
+      ...customization,
+      unitPrice,
+      lineTotal: Number((unitPrice * customization.quantity).toFixed(2)),
+    };
+
+    if (Number.isInteger(staffState.editingCartIndex) && staffState.cart[staffState.editingCartIndex]) {
+      staffState.cart[staffState.editingCartIndex] = updatedLine;
+      setStatus('staff-cart-status', `Updated ${product.name}.`, 'success');
+      renderCart();
+      await refreshPreview();
+      resetCustomizationForm();
+      closeStaffCustomizationDialog();
+      return;
+    }
 
     // 1. Check if an identical item already exists in the cart
     const existingItem = staffState.cart.find(item =>
       item.productId === product.id &&
       item.size === customization.size &&
       item.sugarPercent === customization.sugarPercent &&
-      JSON.stringify(item.toppings.sort()) === JSON.stringify(customization.toppings.sort())
+      JSON.stringify([...(item.toppings || [])].sort()) === JSON.stringify([...(customization.toppings || [])].sort())
     );
 
     if (existingItem) {
@@ -817,13 +1085,7 @@ async function bootStaff() {
       setStatus('staff-cart-status', `Updated ${product.name} quantity.`, 'success');
     } else {
       // 3. Add as a new block if it's different
-      staffState.cart.push({
-        ...product,
-        productId: product.id,
-        ...customization,
-        unitPrice: Number(product.price),
-        lineTotal: Number((Number(product.price) * customization.quantity).toFixed(2)),
-      });
+      staffState.cart.push(updatedLine);
       setStatus('staff-cart-status', `Added ${product.name} to cart.`, 'success');
     }
 
@@ -842,8 +1104,24 @@ async function bootStaff() {
   document.getElementById('staff-qty-increment')?.addEventListener('click', () => {
     adjustStaffQuantity(1);
   });
+  document.querySelectorAll('input[name="staff-size"], input[name="staff-ice"]').forEach((input) => {
+    input.addEventListener('change', renderStaffCustomizationPrice);
+  });
+  document.querySelector('.staff-topping-grid')?.addEventListener('change', (event) => {
+    if (event.target.matches('input[name="staff-topping"]')) {
+      renderStaffCustomizationPrice();
+    }
+  });
+  document.getElementById('staff-sugar')?.addEventListener('input', (event) => {
+    setText('staff-sugar-value', `${event.target.value}%`);
+    renderStaffCustomizationPrice();
+  });
   document.getElementById('staff-close-customization-dialog')?.addEventListener('click', closeStaffCustomizationDialog);
-  document.getElementById('staff-customization-dialog')?.addEventListener('close', restoreStaffCustomizationDialogFocus);
+  document.getElementById('staff-customization-dialog')?.addEventListener('close', () => {
+    staffState.editingCartIndex = null;
+    document.getElementById('staff-add-to-cart').textContent = 'Add to Order';
+    restoreStaffCustomizationDialogFocus();
+  });
   document.getElementById('staff-customization-dialog')?.addEventListener('keydown', (event) => {
     const dialog = event.currentTarget;
     if (!dialog.hasAttribute('open')) {
@@ -917,16 +1195,12 @@ async function bootStaff() {
       setStatus('staff-checkout-status', 'Error: ' + error.message, 'error');
     }
   };
-  document.getElementById('staff-sign-out').onclick = () => {
-    clearRoleSession();
+  document.getElementById('staff-sign-out').onclick = async () => {
+    await logoutAuthSession();
     location.reload(); // Simplest way to reset everything
   };
 
   // UI sugar and ice level display
-  document.getElementById('staff-sugar').oninput = (e) => {
-    setText('staff-sugar-value', `${e.target.value}%`);
-  };
-  
 }
 
 function showStaffWorkspace(session) {
@@ -938,12 +1212,15 @@ function showStaffWorkspace(session) {
 
 async function loadStaffProducts() {
   setStatus('staff-products-status', 'Loading live menu...', 'neutral');
-  const [productsData, categoriesData] = await Promise.all([
+  const [productsData, categoriesData, inventoryData] = await Promise.all([
     fetchJson('/api/products'),
     fetchJson('/api/categories'),
+    fetchJson('/api/inventory'),
   ]);
 
   staffState.products = productsData.items || [];
+  staffState.toppings = getToppingNamesFromInventory(inventoryData.items || []);
+  renderStaffToppingOptions();
   const select = document.getElementById('staff-category-filter');
   select.innerHTML = '<option value="all">All categories</option>';
   (categoriesData.items || []).forEach((category) => {
@@ -957,8 +1234,7 @@ async function loadStaffProducts() {
   const firstAvailableStaffProduct = getFirstAvailableProduct(staffState.products);
   if (!staffState.selectedProductId) {
     staffState.selectedProductId = firstAvailableStaffProduct ? firstAvailableStaffProduct.id : null;
-    setText('staff-selected-product', firstAvailableStaffProduct ? firstAvailableStaffProduct.name : 'No in-stock product selected');
-    setText('staff-selected-price', firstAvailableStaffProduct ? `Base price ${formatCurrency(firstAvailableStaffProduct.price)} before size adjustment.` : 'Products marked out of stock cannot be customized.');
+    setStaffSelectedProductText(firstAvailableStaffProduct);
   }
 
   renderStaffProducts();
@@ -1573,8 +1849,8 @@ async function bootManager() {
   });
 
   // 6. Handle Sign Out
-  document.getElementById('manager-sign-out').addEventListener('click', () => {
-    clearRoleSession();
+  document.getElementById('manager-sign-out').addEventListener('click', async () => {
+    await logoutAuthSession();
     document.getElementById('manager-workspace').hidden = true;
     document.getElementById('manager-login-card').hidden = false;
     document.getElementById('manager-login-form')?.reset();
@@ -2006,7 +2282,13 @@ function normalizeCustomerCategory(product) {
   if (source.includes('boba') || source.includes('pearl') || source.includes('tapioca') || source.includes('brown sugar')) {
     return 'boba-tea';
   }
-  return 'tea';
+  if (source.includes('coffee') || source.includes('espresso') || source.includes('latte') || source.includes('mocha')) {
+    return 'coffee';
+  }
+  if (source.includes('classic tea') || source.includes('brewed tea') || source.includes('plain tea')) {
+    return 'tea';
+  }
+  return 'fruit-tea';
 }
 
 function getCustomerProductsForActiveCategory() {
@@ -2122,9 +2404,28 @@ function resetCustomerCustomizationForm() {
   // Add this line to reset the ice back to 50% when the dialog closes
   document.querySelector('input[name="customer-ice"][value="50"]').checked = true; 
   
-  document.querySelectorAll('input[name="customer-topping"]').forEach((element) => {
-    element.checked = false;
-  });
+  renderCustomerToppingOptions();
+}
+
+function populateCustomerCustomizationForm(line) {
+  setCustomerQuantity(line.quantity);
+  const sizeField = document.querySelector(`input[name="customer-size"][value="${line.size || 'Medium'}"]`);
+  if (sizeField) {
+    sizeField.checked = true;
+  }
+
+  const sugarInput = document.getElementById('customer-sugar');
+  if (sugarInput) {
+    sugarInput.value = String(line.sugarPercent ?? 50);
+    setText('customer-sugar-value', `${sugarInput.value}%`);
+  }
+
+  const iceField = document.querySelector(`input[name="customer-ice"][value="${line.icePercent ?? 50}"]`);
+  if (iceField) {
+    iceField.checked = true;
+  }
+
+  renderCustomerToppingOptions(line.toppings || []);
 }
 
 function setCustomerQuantity(nextValue) {
@@ -2134,6 +2435,7 @@ function setCustomerQuantity(nextValue) {
   }
 
   quantityInput.value = String(Math.max(1, Number(nextValue) || 1));
+  renderCustomerDialogPrice();
 }
 
 function adjustCustomerQuantity(delta) {
@@ -2551,10 +2853,16 @@ function renderCustomerCart() {
         </div>
         <div class="cart-actions">
           <strong>${formatCurrency(line.lineTotal)}</strong>
-          <button class="ghost-button mini-button" type="button">Remove</button>
+          <div class="customer-cart-action-buttons">
+            <button class="ghost-button mini-button customer-cart-edit" type="button">${escapeHtml(t('Edit'))}</button>
+            <button class="ghost-button mini-button customer-cart-remove" type="button" aria-label="Remove ${escapeHtml(line.name)}">X</button>
+          </div>
         </div>
       `;
-      row.querySelector('button').addEventListener('click', async () => {
+      row.querySelector('.customer-cart-edit')?.addEventListener('click', () => {
+        openCustomerDialog(line.productId, index);
+      });
+      row.querySelector('.customer-cart-remove')?.addEventListener('click', async () => {
         customerState.cart.splice(index, 1);
         renderCustomerCart();
         await refreshCustomerPreview();
@@ -2614,9 +2922,10 @@ async function refreshCustomerPreview() {
   setStatus('customer-cart-status', 'Cart totals are up to date.', 'success');
 }
 
-function openCustomerDialog(productId) {
+function openCustomerDialog(productId, cartIndex = null) {
   customerState.lastDialogTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   customerState.selectedProductId = productId;
+  customerState.editingCartIndex = Number.isInteger(cartIndex) ? cartIndex : null;
   const product = getCustomerSelectedProduct();
   if (!product) {
     return;
@@ -2625,9 +2934,18 @@ function openCustomerDialog(productId) {
     setStatus('customer-cart-status', `${product.name} is out of stock right now.`, 'error');
     return;
   }
-  resetCustomerCustomizationForm();
+  const line = Number.isInteger(customerState.editingCartIndex) ? customerState.cart[customerState.editingCartIndex] : null;
+  if (line) {
+    populateCustomerCustomizationForm(line);
+  } else {
+    resetCustomerCustomizationForm();
+  }
   setText('customer-dialog-title', t(product.name));
-  setText('customer-dialog-price', `${t('Base price')} ${formatCurrency(product.price)}. ${t('Adjust size, sweetness, ice, and toppings.')}`);
+  renderCustomerDialogPrice();
+  setCustomerCheckoutButtonLabel(
+    document.getElementById('customer-add-to-cart'),
+    line ? 'Update Item' : 'Add To Cart'
+  );
   const dialog = document.getElementById('customer-customize-dialog');
   if (typeof dialog.showModal === 'function') {
     dialog.showModal();
@@ -2641,10 +2959,13 @@ function closeCustomerDialog() {
   const dialog = document.getElementById('customer-customize-dialog');
   if (typeof dialog.close === 'function') {
     dialog.close();
+    return;
   } else {
     dialog.removeAttribute('open');
   }
 
+  customerState.editingCartIndex = null;
+  setCustomerCheckoutButtonLabel(document.getElementById('customer-add-to-cart'), 'Add To Cart');
   restoreCustomerDialogFocus();
 }
 
@@ -2656,24 +2977,35 @@ async function addCustomerSelectionToCart() {
   }
 
   const customization = readCustomerCustomizationForm();
+  const unitPrice = calculateCustomizedUnitPrice(product.price, customization);
+  const updatedLine = {
+    productId: product.id,
+    name: product.name,
+    category: product.category,
+    quantity: customization.quantity,
+    size: customization.size,
+    sugarPercent: customization.sugarPercent,
+    icePercent: customization.icePercent,
+    toppings: customization.toppings,
+    unitPrice,
+    lineTotal: Number((unitPrice * customization.quantity).toFixed(2)),
+  };
+
+  if (Number.isInteger(customerState.editingCartIndex) && customerState.cart[customerState.editingCartIndex]) {
+    customerState.cart[customerState.editingCartIndex] = updatedLine;
+    closeCustomerDialog();
+    renderCustomerCart();
+    await refreshCustomerPreview();
+    return;
+  }
+
   const existing = customerState.cart.find((line) => line.productId === product.id && customizationMatches(line, customization));
 
   if (existing) {
     existing.quantity += customization.quantity;
     existing.lineTotal = Number((existing.unitPrice * existing.quantity).toFixed(2));
   } else {
-    customerState.cart.push({
-      productId: product.id,
-      name: product.name,
-      category: product.category,
-      quantity: customization.quantity,
-      size: customization.size,
-      sugarPercent: customization.sugarPercent,
-      icePercent: customization.icePercent,
-      toppings: customization.toppings,
-      unitPrice: Number(product.price),
-      lineTotal: Number((Number(product.price) * customization.quantity).toFixed(2)),
-    });
+    customerState.cart.push(updatedLine);
   }
 
   closeCustomerDialog();
@@ -2811,6 +3143,14 @@ function attachCustomerEventHandlers() {
   });
   document.getElementById('customer-qty').addEventListener('input', (event) => {
     setCustomerQuantity(event.target.value);
+  });
+  document.querySelectorAll('input[name="customer-size"]').forEach((input) => {
+    input.addEventListener('change', renderCustomerDialogPrice);
+  });
+  document.querySelector('.customer-topping-grid')?.addEventListener('change', (event) => {
+    if (event.target.matches('input[name="customer-topping"]')) {
+      renderCustomerDialogPrice();
+    }
   });
   document.getElementById('customer-sugar')?.addEventListener('input', (event) => {
     setText('customer-sugar-value', `${event.target.value}%`);
@@ -3006,7 +3346,11 @@ function attachCustomerEventHandlers() {
   });
   document.getElementById('customer-checkout').addEventListener('click', handleCustomerCheckout);
   document.getElementById('customer-close-dialog').addEventListener('click', closeCustomerDialog);
-  document.getElementById('customer-customize-dialog').addEventListener('close', restoreCustomerDialogFocus);
+  document.getElementById('customer-customize-dialog').addEventListener('close', () => {
+    customerState.editingCartIndex = null;
+    setCustomerCheckoutButtonLabel(document.getElementById('customer-add-to-cart'), 'Add To Cart');
+    restoreCustomerDialogFocus();
+  });
   document.getElementById('customer-customize-dialog').addEventListener('keydown', (event) => {
     const dialog = event.currentTarget;
     if (!dialog.hasAttribute('open')) {
@@ -3064,24 +3408,36 @@ async function bootCustomer() {
   setCustomerContrastPreference(customerState.highContrast);
   setCustomerTextScale(customerState.textScale);
   setCustomerZoomScale(customerState.zoomScale);
-  await loadCustomerRewardsSession();
   renderCustomerRewards();
   renderCustomerCart();
+  renderCustomerToppingOptions();
   attachCustomerEventHandlers();
   attachChatEventHandlers();
+  loadCustomerToppingsFromInventory();
 
-  setStatus('customer-products-status', 'Loading live menu from the database...', 'loading');
-  const data = await fetchJson('/api/products');
-  customerState.products = data.items || [];
+  const rewardsSessionPromise = loadCustomerRewardsSession()
+    .then(() => {
+      renderCustomerRewards();
+      renderCustomerCart();
+    })
+    .catch((error) => {
+      console.warn('Unable to restore customer rewards session:', error);
+    });
 
-  const firstNonEmptyCategory = CUSTOMER_CATEGORY_ORDER.find((key) =>
-    customerState.products.some((item) => normalizeCustomerCategory(item) === key)
-  );
-  customerState.activeCategory = firstNonEmptyCategory || 'tea';
+  const cachedProducts = loadCustomerProductsCache();
+  if (cachedProducts.length) {
+    setCustomerProducts(cachedProducts);
+    setStatus('customer-products-status', 'Menu ready. Refreshing latest prices and stock...', 'success');
+  } else {
+    setStatus('customer-products-status', 'Loading live menu from the database...', 'loading');
+  }
 
-  renderCustomerCategoryButtons();
-  renderCustomerProducts();
-  setStatus('customer-products-status', 'Live menu loaded. Choose a category to begin.', 'success');
+  const data = await fetchJson('/api/products?availability=false');
+  setCustomerProducts(data.items || [], Boolean(cachedProducts.length));
+  saveCustomerProductsCache(customerState.products);
+  setStatus('customer-products-status', 'Menu ready. Checking current stock...', 'success');
+  refreshCustomerProductsInBackground();
+  await rewardsSessionPromise;
 }
 
 async function boot() {
