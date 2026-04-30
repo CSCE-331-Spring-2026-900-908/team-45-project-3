@@ -441,6 +441,7 @@ function createApp() {
 
   // Google uses zh-CN for Simplified Chinese; all other codes match directly
   const GOOGLE_LANG_MAP = { zh: 'zh-CN' };
+  const GOOGLE_TRANSLATE_BATCH_SIZE = 100;
 
   // --- Machine Translation route (Google Cloud Translation API) ---
   app.post('/api/translate', asyncHandler(async (req, res) => {
@@ -465,20 +466,24 @@ function createApp() {
     const googleLang = GOOGLE_LANG_MAP[targetLang] || targetLang;
     const url = `https://translation.googleapis.com/language/translate/v2?key=${apiKey}`;
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ q: texts, target: googleLang, source: 'en', format: 'text' }),
-    });
+    const translated = [];
+    for (let index = 0; index < texts.length; index += GOOGLE_TRANSLATE_BATCH_SIZE) {
+      const batch = texts.slice(index, index + GOOGLE_TRANSLATE_BATCH_SIZE);
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ q: batch, target: googleLang, source: 'en', format: 'text' }),
+      });
 
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      res.status(502).json({ error: err?.error?.message || 'Google Translate request failed.' });
-      return;
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        res.status(502).json({ error: err?.error?.message || 'Google Translate request failed.' });
+        return;
+      }
+
+      const data = await response.json();
+      translated.push(...(data?.data?.translations?.map((t) => t.translatedText) ?? batch));
     }
-
-    const data = await response.json();
-    const translated = data?.data?.translations?.map((t) => t.translatedText) ?? texts;
 
     res.json({ translations: Object.fromEntries(texts.map((s, i) => [s, translated[i] ?? s])) });
   }));

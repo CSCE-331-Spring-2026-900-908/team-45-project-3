@@ -204,7 +204,7 @@ async function applyLanguage(lang) {
     renderCustomerRewards();
     renderCustomerCart();
     renderCustomerToppingOptions();
-    return;
+    return true;
   }
 
   const allUnique = collectAllTranslatableStrings();
@@ -214,11 +214,11 @@ async function applyLanguage(lang) {
   const ok = await fetchTranslations(uncached, lang);
 
   // Guard: discard if user switched again while we were waiting
-  if (seq !== translationSeq) return;
+  if (seq !== translationSeq) return false;
 
   if (!ok) {
     setStatus('customer-products-status', 'Translation failed — check that GOOGLE_TRANSLATE_API_KEY is set and the Cloud Translation API is enabled in your Google Cloud project.', 'error');
-    return;
+    return false;
   }
 
   document.querySelectorAll('[data-i18n]').forEach((el) => {
@@ -244,6 +244,7 @@ async function applyLanguage(lang) {
       fetchTranslations(toFetch, otherLang); // intentionally not awaited
     }
   }
+  return true;
 }
 
 
@@ -3250,8 +3251,10 @@ function attachCustomerEventHandlers() {
   document.getElementById('customer-lang-select')?.addEventListener('change', async (event) => {
     const lang = event.target.value;
     setStatus('customer-products-status', lang === 'en' ? 'Restoring English...' : 'Translating page...', 'neutral');
-    await applyLanguage(lang);
-    setStatus('customer-products-status', lang === 'en' ? 'English restored.' : 'Translation applied.', 'success');
+    const ok = await applyLanguage(lang);
+    if (ok) {
+      setStatus('customer-products-status', lang === 'en' ? 'English restored.' : 'Translation applied.', 'success');
+    }
   });
 
   document.getElementById('customer-open-rewards')?.addEventListener('click', openCustomerRewardsDialog);
