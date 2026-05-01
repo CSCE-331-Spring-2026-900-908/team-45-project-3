@@ -168,6 +168,21 @@ const JS_STATIC_STRINGS = [
   'A cozy sip for cool weather.',
   'A warm classic for chilly weather.',
   'A smooth pick for mild weather.',
+  'clear',
+  'cloudy',
+  'foggy',
+  'rainy',
+  'stormy',
+  'snowy',
+  'mild',
+  'sugar',
+  'ice',
+  'Qty',
+  'at',
+  'Remove',
+  'Free drink credit applied! Your cheapest item is on us.',
+  'available',
+  'Accessibility Controls',
   'How are you paying?',
   'Credit Card',
   'Cash',
@@ -225,6 +240,7 @@ async function applyLanguage(lang) {
     if (chatInput) chatInput.placeholder = 'Ask about the menu\u2026';
     renderCustomerCategoryButtons();
     renderCustomerProducts();
+    renderCustomerWeatherFeature();
     renderCustomerRewards();
     renderCustomerCart();
     renderCustomerToppingOptions();
@@ -252,6 +268,7 @@ async function applyLanguage(lang) {
   if (chatInput) chatInput.placeholder = t('Ask about the menu\u2026');
   renderCustomerCategoryButtons();
   renderCustomerProducts();
+  renderCustomerWeatherFeature();
   renderCustomerRewards();
   renderCustomerCart();
   renderCustomerToppingOptions();
@@ -447,7 +464,7 @@ function getSelectedProduct() {
 }
 
 function formatIceLevel(value) {
-  return Number(value) === 200 ? 'Hot' : `${Number(value || 0)}% ice`;
+  return Number(value) === 200 ? t('Hot') : `${Number(value || 0)}% ${t('ice')}`;
 }
 
 function readStaffIcePercent() {
@@ -773,7 +790,8 @@ function renderCustomerWeatherFeature() {
   const weather = customerState.weather;
   const hasTemperature = Number.isFinite(Number(weather?.temperatureF));
   const temperatureLabel = hasTemperature ? `${Math.round(Number(weather.temperatureF))}°F` : t('Today\'s Pick');
-  const condition = weather ? getWeatherDescription(weather.weatherCode) : 'today';
+  const conditionRaw = weather ? getWeatherDescription(weather.weatherCode) : '';
+  const conditionLabel = conditionRaw ? t(conditionRaw) : '';
   const drinkSlug = String(product.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
   container.hidden = false;
@@ -782,14 +800,14 @@ function renderCustomerWeatherFeature() {
       <span class="customer-featured-copy">
         <span class="section-label">${escapeHtml(t('Weather Pick'))}</span>
         <strong>${escapeHtml(t(product.name))}</strong>
-        <span>${escapeHtml(temperatureLabel)}${weather ? ` ${escapeHtml(condition)}` : ''} · ${escapeHtml(t(pick.reason))}</span>
+        <span>${escapeHtml(temperatureLabel)}${conditionLabel ? ` ${escapeHtml(conditionLabel)}` : ''} · ${escapeHtml(t(pick.reason))}</span>
       </span>
       <span class="customer-featured-price">${formatCurrency(product.price)}</span>
     </button>
   `;
 
   const button = container.querySelector('.customer-featured-button');
-  button?.setAttribute('aria-label', `${t('Weather Pick')}: ${t(product.name)}, ${formatCurrency(product.price)}. ${t('Open customization options.')}`);
+  button?.setAttribute('aria-label', `${t('Weather Pick')}: ${t(product.name)}, ${formatCurrency(product.price)}. ${conditionLabel ? `${conditionLabel}. ` : ''}${t('Open customization options.')}`);
   button?.addEventListener('click', () => openCustomerDialog(product.id));
 }
 
@@ -814,8 +832,8 @@ function customizationMatches(a, b) {
 }
 
 function customizationSummary(item) {
-  const toppings = item.toppings.length ? `, ${item.toppings.join(', ')}` : '';
-  return `${item.size}, ${item.sugarPercent}% sugar, ${formatIceLevel(item.icePercent)}${toppings}`;
+  const toppings = item.toppings.length ? `, ${item.toppings.map((tp) => t(tp)).join(', ')}` : '';
+  return `${t(item.size)}, ${item.sugarPercent}% ${t('sugar')}, ${formatIceLevel(item.icePercent)}${toppings}`;
 }
 
 function calculateCustomizedUnitPrice(basePrice, customization) {
@@ -2987,13 +3005,13 @@ function renderCustomerCart() {
         <div>
           <h3>${escapeHtml(line.name)}</h3>
           <p>${escapeHtml(customizationSummary(line))}</p>
-          <p class="muted-line">Qty ${line.quantity} at ${formatCurrency(line.unitPrice)}</p>
+          <p class="muted-line">${escapeHtml(t('Qty'))} ${line.quantity} ${escapeHtml(t('at'))} ${formatCurrency(line.unitPrice)}</p>
         </div>
         <div class="cart-actions">
           <strong>${formatCurrency(line.lineTotal)}</strong>
           <div class="customer-cart-action-buttons">
             <button class="ghost-button mini-button customer-cart-edit" type="button">${escapeHtml(t('Edit'))}</button>
-            <button class="ghost-button mini-button customer-cart-remove" type="button" aria-label="Remove ${escapeHtml(line.name)}">X</button>
+            <button class="ghost-button mini-button customer-cart-remove" type="button" aria-label="${escapeHtml(t('Remove'))} ${escapeHtml(line.name)}">X</button>
           </div>
         </div>
       `;
@@ -3019,7 +3037,7 @@ function renderCustomerCart() {
   const credits = customerState.profile ? (customerState.profile.freeDrinkCredits || 0) : 0;
   if (customerState.rewardDiscount > 0 && credits > 0) {
     rewardBanner.hidden = false;
-    rewardBanner.textContent = `Free drink credit applied! Your cheapest item is on us. (${credits} credit${credits === 1 ? '' : 's'} available)`;
+    rewardBanner.textContent = `${t('Free drink credit applied! Your cheapest item is on us.')} (${credits} ${credits === 1 ? t('credit') : t('credits')} ${t('available')})`;
   } else {
     rewardBanner.hidden = true;
     rewardBanner.textContent = '';
