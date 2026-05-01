@@ -1944,6 +1944,7 @@ body.high-contrast .chat-quick-option {
 .drink-pumpkin-coffee { background-image: url('/assets/drinks/coffee/pumpkin-coffee.jpg') !important; }
 .drink-peppermint-milk-tea { background-image: url('/assets/drinks/seasonal/peppermint-milk-tea.jpg') !important; }
 .drink-pumpkin-spice-latte { background-image: url('/assets/drinks/seasonal/pumpkin-spice-latte.jpg') !important; }
+.drink-double-pumpkin-matcha { background-image: url('/assets/drinks/seasonal/double-pumpkin-matcha.jpg') !important; }
 
 /* ── Payment Dialog ───────────────────────────────────────────── */
 .customer-payment-options {
