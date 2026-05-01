@@ -182,6 +182,7 @@ const JS_STATIC_STRINGS = [
   'Remove',
   'Free drink credit applied! Your cheapest item is on us.',
   'available',
+  'Accessibility Controls',
   'How are you paying?',
   'Credit Card',
   'Cash',
